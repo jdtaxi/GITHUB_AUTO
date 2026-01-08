@@ -26,6 +26,7 @@ jobs:
 
       - name: Run Incudal script
         env:
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
           USER_SESSION: ${{ secrets.USER_SESSION }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
