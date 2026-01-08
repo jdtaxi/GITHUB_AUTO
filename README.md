@@ -1,0 +1,13 @@
+GH_2FA_SECRET
+-二次验证码
+GH_PASSWORD
+-账户密码
+GH_USERNAME
+-账户名
+PROXY
+-代理
+REPO_TOKEN
+-具有repo权限的token
+TG_BOT_TOKEN
+
+TG_CHAT_ID
