@@ -36,4 +36,4 @@ jobs:
           PROXY: ${{ secrets.PROXY }}
           GH_2FA_SECRET: ${{ secrets.GH_2FA_SECRET }}
           
-        run: python scripts/ClawCloud_alive.py
+        run: python ClawCloud_alive.py
