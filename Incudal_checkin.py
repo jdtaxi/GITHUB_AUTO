@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
 # ====================== 基础配置 ======================
 
-INSTANCE_IDS = [1223, 753]
+INSTANCE_IDS = {"greenwave1987":[1223, 753],"jdtaxi":[2013]}
 
 TARGET_URL = "https://incudal.com"
 SIGNIN_URL = f"{TARGET_URL}/login"
@@ -1034,7 +1034,7 @@ class AutoLogin:
                     success = 0
                     level = STATUS_OK
                 
-                    for iid in INSTANCE_IDS:
+                    for iid in INSTANCE_IDS[self.username]:
                         try:
                             data = self.redeem_instance(session, redeem_code, iid)
                             if data.get("success") is True:
@@ -1050,7 +1050,7 @@ class AutoLogin:
                 
                     if success == 0:
                         level = STATUS_FAIL
-                    elif success < len(INSTANCE_IDS):
+                    elif success < len(INSTANCE_IDS[self.username]):
                         level = STATUS_PARTIAL
                 
                     msgtemp = "\n".join(tg_lines)
