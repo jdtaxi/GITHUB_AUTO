@@ -6,13 +6,13 @@ import string
 import logging
 import sys
 from datetime import datetime
-
+import re
 import requests
 
 # ==================== 基础配置 ====================
-
+username = os.environ.get('GH_USERNAME')
 BASE_URL = "https://incudal.com"
-SSH_KEY_ID = 1015
+SSH_KEY_ID = {"greenwave1987":1015,"jdtaxi":1015}
 
 # ==================== 日志 ====================
 
@@ -104,6 +104,9 @@ def random_instance_name(prefix="ss"):
     rand = "".join(random.choices(string.ascii_lowercase + string.digits, k=4))
     return f"{prefix}-{date}-{rand}"
 
+def contains_chinese(text: str) -> bool:
+    return bool(re.search(r'[\u4e00-\u9fff]', text))
+
 # ==================== API ====================
 
 def get_packages(session):
@@ -113,6 +116,9 @@ def get_packages(session):
 
 def create_instance_with_retry(session, package, retries=3):
     pid = package["id"]
+    cpu = package["cpu_max"]
+    memory = package["memory_max"]
+    disk = package["disk_max"]
     pname = package["name"]
 
     for attempt in range(1, retries + 1):
@@ -123,10 +129,10 @@ def create_instance_with_retry(session, package, retries=3):
             "name": name,
             "packageId": pid,
             "image": "images:alpine/3.20/cloud",
-            "cpu": 30,
-            "memory": 160,
-            "disk": 2550,
-            "sshKeyId": SSH_KEY_ID
+            "cpu": cpu,
+            "memory": memory,
+            "disk": disk,
+            "sshKeyId": SSH_KEY_ID[username]
         }
 
         r = session.post(
@@ -179,11 +185,15 @@ def main():
     logger.info(f"获取到 {len(packages)} 个 package")
 
     for pkg in packages:
-        logger.info(f"➡️ 尝试 packageId={pkg['id']} ({pkg['name']})")
-
-        if create_instance_with_retry(session, pkg, retries=3):
-            logger.info("🎉 脚本结束（已成功创建实例）")
-            return
+        s = "德国"
+        if contains_chinese(s):
+            logger.info(f"🚫 跳过 packageId={pkg['id']} ({pkg['name']})")
+        else:
+            logger.info(f"➡️ 尝试 packageId={pkg['id']} ({pkg['name']})")
+    
+            if create_instance_with_retry(session, pkg, retries=3):
+                logger.info("🎉 脚本结束（已成功创建实例）")
+                return
 
     logger.error("🚫 所有 package 均创建失败")
     tg_notify("🚫 <b>Incudal</b>\n所有 package 均创建失败")
