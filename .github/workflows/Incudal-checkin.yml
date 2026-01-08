@@ -36,4 +36,4 @@ jobs:
           PROXY: ${{ secrets.PROXY }}
           GH_2FA_SECRET: ${{ secrets.GH_2FA_SECRET }}
           
-        run: python scripts/Incudal_checkin.py
+        run: python Incudal_checkin.py
