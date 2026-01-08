@@ -16,8 +16,8 @@ jobs:
 
       - name: Sync upstream
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
+          git config user.name "jdtaxi"
+          git config user.email "jdtaxi@github.com"
 
           git remote add upstream https://github.com/greenwave1987/GITHUB_AUTO.git
           git fetch upstream
