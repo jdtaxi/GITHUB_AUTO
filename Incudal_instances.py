@@ -104,9 +104,6 @@ def random_instance_name(prefix="ss"):
     rand = "".join(random.choices(string.ascii_lowercase + string.digits, k=4))
     return f"{prefix}-{date}-{rand}"
 
-def contains_chinese(text: str) -> bool:
-    return bool(re.search(r'[\u4e00-\u9fff]', text))
-
 # ==================== API ====================
 
 def get_packages(session):
@@ -185,8 +182,7 @@ def main():
     logger.info(f"获取到 {len(packages)} 个 package")
 
     for pkg in packages:
-        s = "德国"
-        if contains_chinese(s):
+        if "德国" in pkg['name']::
             logger.info(f"🚫 跳过 packageId={pkg['id']} ({pkg['name']})")
         else:
             logger.info(f"➡️ 尝试 packageId={pkg['id']} ({pkg['name']})")
