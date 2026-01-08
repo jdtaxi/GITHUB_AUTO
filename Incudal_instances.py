@@ -12,7 +12,7 @@ import requests
 # ==================== 基础配置 ====================
 username = os.environ.get('GH_USERNAME')
 BASE_URL = "https://incudal.com"
-SSH_KEY_ID = {"greenwave1987":1015,"jdtaxi":1015}
+SSH_KEY_ID = {"greenwave1987":536,"jdtaxi":1015}
 
 # ==================== 日志 ====================
 
