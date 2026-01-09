@@ -1,15 +1,21 @@
-name: Leaflow 签到
+name: Leaflow 自动登录签到
 
 on:
   workflow_dispatch:
   schedule:
-    # 每天北京时间 08:05（UTC 00:05）
-    - cron: "5 0 * * *"
+    - cron: "5 0 * * *"   # 北京时间 08:05
+
+concurrency:
+  group: leaflow-checkin
+  cancel-in-progress: true
 
 jobs:
   checkin:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    env:
+      TZ: Asia/Shanghai
 
     steps:
       - name: 📥 Checkout repository
@@ -34,8 +40,7 @@ jobs:
             libxdamage1 \
             libxfixes3 \
             libgbm1 \
-            libasound2t64
-
+            libasound2 || true
 
       - name: 📦 Install Python dependencies
         run: |
@@ -45,20 +50,18 @@ jobs:
 
       - name: ▶️ Run Leaflow Checkin
         env:
-            LEAFLOW_ACCOUNTS: ${{ secrets.LEAFLOW_ACCOUNTS }}
-            LEAFLOW_COOKIES:  ${{ secrets.LEAFLOW_COOKIES }}
-            REPO_TOKEN:       ${{ secrets.REPO_TOKEN }}
-            TG_BOT_TOKEN:     ${{ secrets.TG_BOT_TOKEN }}
-            TG_CHAT_ID:       ${{ secrets.TG_CHAT_ID }}
+          LEAFLOW_ACCOUNTS: ${{ secrets.LEAFLOW_ACCOUNTS }}
+          LEAFLOW_COOKIES:  ${{ secrets.LEAFLOW_COOKIES }}
+          REPO_TOKEN:       ${{ secrets.REPO_TOKEN }}
+          TG_BOT_TOKEN:     ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID:       ${{ secrets.TG_CHAT_ID }}
         run: |
-          set -x
           python -u leaflow/Leaflow_checkin.py
 
-      - name: Upload Leaflow screenshots
+      - name: 📸 Upload Leaflow screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: leaflow-login-fail
           path: |
-            *.png
-
+            **/*.png
