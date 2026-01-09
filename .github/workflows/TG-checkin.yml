@@ -26,4 +26,4 @@ jobs:
           TG_SESSIONS: ${{ secrets.TG_SESSIONS }}
           PROXIES: ${{ secrets.PROXIES }}
         run: |
-          python icmp9.py
+          python TG_checkin.py
