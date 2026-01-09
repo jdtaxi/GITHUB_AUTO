@@ -179,7 +179,7 @@ def login(page, email, password):
                 print("☑ 已勾选保持登录状态")
         except Exception:
             print("⚠ 未找到保持登录状态按钮")
-        page.wait_for_timeout(30000)
+        page.wait_for_timeout(50000)
         
         # 登录按钮
         login_btn = page.locator(
@@ -189,7 +189,7 @@ def login(page, email, password):
         login_btn.wait_for(state="visible", timeout=10000)
         login_btn.click()
         print("➡ 已点击登录按钮")
-
+        page.wait_for_timeout(30000)
         page.wait_for_load_state("networkidle", timeout=30000)
 
         if "login" in page.url.lower():
