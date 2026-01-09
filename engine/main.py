@@ -8,14 +8,20 @@ from nacl import public, encoding
 REPO = os.getenv("GITHUB_REPOSITORY")
 REPO_TOKEN = os.getenv("REPO_TOKEN")
 
-# engine/github_secret.py
+# ==================================================
+# GitHub Secret 回写
+# ==================================================
+
 class SecretUpdater:
     def __init__(self, name):
         self.name = name
+        print(f"🔐 [SecretUpdater] 初始化，secret 名称 = {name}")
 
     def update(self, value):
+        print("📝 [SecretUpdater] 准备回写 GitHub Secret")
+
         if not REPO or not REPO_TOKEN:
-            print("⚠ 未配置 GitHub Repo Token，跳过回写")
+            print("⚠ [SecretUpdater] 未配置 GITHUB_REPOSITORY / REPO_TOKEN，跳过")
             return
 
         headers = {
@@ -23,29 +29,48 @@ class SecretUpdater:
             "Accept": "application/vnd.github.v3+json"
         }
 
+        print(f"🌐 [SecretUpdater] 获取公钥: {REPO}")
         r = requests.get(
             f"https://api.github.com/repos/{REPO}/actions/secrets/public-key",
-            headers=headers
+            headers=headers,
+            timeout=30
         )
+
+        print(f"⬅️ [SecretUpdater] 公钥接口返回 {r.status_code}")
+        r.raise_for_status()
+
         key = r.json()
 
+        print("🔑 [SecretUpdater] 开始加密 Secret")
         pk = public.PublicKey(key["key"].encode(), encoding.Base64Encoder())
         encrypted = public.SealedBox(pk).encrypt(value.encode())
 
-        requests.put(
+        print(f"📤 [SecretUpdater] 提交 Secret: {self.name}")
+        r = requests.put(
             f"https://api.github.com/repos/{REPO}/actions/secrets/{self.name}",
             headers=headers,
             json={
                 "encrypted_value": base64.b64encode(encrypted).decode(),
                 "key_id": key["key_id"]
-            }
+            },
+            timeout=30
         )
 
-# session_factory
+        print(f"✅ [SecretUpdater] 回写完成，HTTP {r.status_code}")
+
+
+# ==================================================
+# Session 工厂
+# ==================================================
+
 def session_from_cookies(cookies: dict, headers=None):
+    print("🧩 [Session] 开始从 cookies 构建 session")
+
     session = requests.Session()
+
     for k, v in cookies.items():
         session.cookies.set(k, v)
+        print(f"🍪 [Session] 注入 cookie: {k}")
 
     session.headers.update({
         "User-Agent": "Mozilla/5.0",
@@ -54,9 +79,15 @@ def session_from_cookies(cookies: dict, headers=None):
 
     if headers:
         session.headers.update(headers)
+        print("📎 [Session] 已合并自定义 headers")
 
-    print("🧩 Session 已从 Cookie 构建完成")
+    print("✅ [Session] Session 构建完成")
     return session
+
+
+# ==================================================
+# 对外统一签到入口
+# ==================================================
 
 def perform_token_checkin(
     cookies: dict,
@@ -64,42 +95,48 @@ def perform_token_checkin(
     checkin_url: str,
     main_site: str,
     headers=None,
-    printer=print
 ):
-    """
-    对外统一签到入口（供 Leaflow_checkin.py 调用）
-    """
-    printer(f"🧩 [{account_name}] 构建 Session 并准备签到")
+    print("=" * 60)
+    print(f"🚀 [{account_name}] perform_token_checkin 入口")
+    print(f"🔗 checkin_url = {checkin_url}")
+    print(f"🏠 main_site  = {main_site}")
 
     session = session_from_cookies(cookies, headers=headers)
 
-    return perform_checkin(
+    result = perform_checkin(
         session=session,
         account_name=account_name,
         checkin_url=checkin_url,
         main_site=main_site,
-        printer=printer
     )
 
-# leaflow_checkin_engine
-def perform_checkin(session, account_name, checkin_url, main_site, printer=print):
-    """执行签到（依赖函数入口）"""
-    printer(f"\n🎯 [{account_name}] 开始签到流程")
+    print(f"🏁 [{account_name}] perform_token_checkin 结束 -> {result}")
+    return result
+
+
+# ==================================================
+# 签到主流程
+# ==================================================
+
+def perform_checkin(session, account_name, checkin_url, main_site):
+    print(f"\n🎯 [{account_name}] 开始签到流程")
 
     try:
         # 1️⃣ 直接访问签到页
-        printer(f"➡️ GET {checkin_url}")
+        print(f"➡️ [STEP1] GET {checkin_url}")
         resp = session.get(checkin_url, timeout=30)
-        printer(f"⬅️ HTTP {resp.status_code}")
+        print(f"⬅️ [STEP1] HTTP {resp.status_code}")
 
         if resp.status_code == 200:
             ok, msg = analyze_and_checkin(
-                session, resp.text, checkin_url, account_name, printer
+                session, resp.text, checkin_url, account_name
             )
+            print(f"📊 [STEP1] 分析结果: {ok}, {msg}")
             if ok:
                 return True, msg
 
         # 2️⃣ API fallback
+        print("🔁 [STEP2] 尝试 API fallback")
         api_endpoints = [
             f"{checkin_url}/api/checkin",
             f"{checkin_url}/checkin",
@@ -108,44 +145,51 @@ def perform_checkin(session, account_name, checkin_url, main_site, printer=print
         ]
 
         for ep in api_endpoints:
-            printer(f"➡️ 尝试接口 {ep}")
-
+            print(f"➡️ [API] GET {ep}")
             try:
                 r = session.get(ep, timeout=30)
-                printer(f"GET {r.status_code}")
+                print(f"⬅️ [API] GET {r.status_code}")
                 if r.status_code == 200:
                     ok, msg = check_checkin_response(r.text)
+                    print(f"📊 [API] GET 解析结果: {ok}, {msg}")
                     if ok:
                         return True, msg
             except Exception as e:
-                printer(f"⚠ GET 失败: {e}")
+                print(f"⚠ [API] GET 异常: {e}")
 
+            print(f"➡️ [API] POST {ep}")
             try:
                 r = session.post(ep, data={"checkin": "1"}, timeout=30)
-                printer(f"POST {r.status_code}")
+                print(f"⬅️ [API] POST {r.status_code}")
                 if r.status_code == 200:
                     ok, msg = check_checkin_response(r.text)
+                    print(f"📊 [API] POST 解析结果: {ok}, {msg}")
                     if ok:
                         return True, msg
             except Exception as e:
-                printer(f"⚠ POST 失败: {e}")
+                print(f"⚠ [API] POST 异常: {e}")
 
+        print("❌ 所有签到方式均失败")
         return False, "所有签到方式均失败"
 
     except Exception as e:
+        print(f"🔥 签到流程异常: {e}")
         return False, f"签到异常: {e}"
 
 
-def analyze_and_checkin(session, html, page_url, account_name, printer):
-    """分析页面并执行签到"""
-    printer(f"🔍 [{account_name}] 分析签到页面")
+# ==================================================
+# 页面分析与辅助函数
+# ==================================================
+
+def analyze_and_checkin(session, html, page_url, account_name):
+    print(f"🔍 [{account_name}] analyze_and_checkin")
 
     if already_checked_in(html):
-        printer("✅ 已签到")
+        print("✅ 检测到已签到")
         return True, "今日已签到"
 
     if not is_checkin_page(html):
-        printer("❌ 不是签到页面")
+        print("❌ 当前页面不是签到页")
         return False, "非签到页面"
 
     data = {
@@ -156,15 +200,15 @@ def analyze_and_checkin(session, html, page_url, account_name, printer):
 
     token = extract_csrf_token(html)
     if token:
-        printer(f"🔐 提取 CSRF Token: {token[:8]}***")
+        print(f"🔐 提取 CSRF Token: {token[:8]}***")
         data["_token"] = token
         data["csrf_token"] = token
     else:
-        printer("⚠ 未检测到 CSRF Token")
+        print("⚠ 未发现 CSRF Token，继续尝试")
 
-    printer(f"📤 POST {page_url}")
+    print(f"📤 POST {page_url} | data={list(data.keys())}")
     r = session.post(page_url, data=data, timeout=30)
-    printer(f"⬅️ HTTP {r.status_code}")
+    print(f"⬅️ POST 返回 {r.status_code}")
 
     if r.status_code == 200:
         return check_checkin_response(r.text)
@@ -173,6 +217,7 @@ def analyze_and_checkin(session, html, page_url, account_name, printer):
 
 
 def already_checked_in(html):
+    print("🔎 [Check] 是否已签到")
     content = html.lower()
     keys = [
         "already checked in", "今日已签到",
@@ -183,12 +228,14 @@ def already_checked_in(html):
 
 
 def is_checkin_page(html):
+    print("🔎 [Check] 是否签到页面")
     content = html.lower()
     keys = ["check-in", "checkin", "签到", "attendance", "daily"]
     return any(k in content for k in keys)
 
 
 def extract_csrf_token(html):
+    print("🔎 [Check] 提取 CSRF Token")
     patterns = [
         r'name=["\']_token["\'][^>]*value=["\']([^"\']+)["\']',
         r'name=["\']csrf_token["\'][^>]*value=["\']([^"\']+)["\']',
@@ -197,12 +244,16 @@ def extract_csrf_token(html):
     for p in patterns:
         m = re.search(p, html, re.IGNORECASE)
         if m:
+            print("✅ CSRF Token 命中")
             return m.group(1)
+    print("❌ 未命中 CSRF Token")
     return None
 
 
 def check_checkin_response(html):
+    print("📥 [Check] 解析签到返回")
     content = html.lower()
+
     success_words = [
         "check-in successful", "签到成功",
         "attendance recorded", "earned reward",
@@ -210,6 +261,7 @@ def check_checkin_response(html):
     ]
 
     if any(w in content for w in success_words):
+        print("🎉 命中成功关键字")
         patterns = [
             r"获得奖励[^\d]*(\d+\.?\d*)",
             r"earned.*?(\d+\.?\d*)",
@@ -221,4 +273,5 @@ def check_checkin_response(html):
                 return True, f"签到成功，获得 {m.group(1)}"
         return True, "签到成功"
 
+    print("❌ 未检测到成功标志")
     return False, "签到返回失败"
