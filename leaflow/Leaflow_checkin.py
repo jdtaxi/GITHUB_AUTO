@@ -5,13 +5,15 @@
 Leaflow Playwright + API 自动签到
 依赖 engine 目录中的模块
 """
+import os
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
 from engine.safe_print import enable_safe_print
 enable_safe_print()
 
-import os
+
 import json
 import time
 import sys
