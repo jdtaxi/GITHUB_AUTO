@@ -54,11 +54,11 @@ jobs:
           set -x
           python -u leaflow/Leaflow_checkin.py
 
-      - name: 📸 Upload login fail screenshots
-        if: failure()
+      - name: Upload Leaflow screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: leaflow-login-fail
           path: |
-            login_fail_*.png
-            leaflow_login_fail_*.png
+            *.png
+
