@@ -5,6 +5,9 @@
 Leaflow Playwright + API 自动签到
 依赖 engine 目录中的模块
 """
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BASE_DIR)
+
 from engine.safe_print import enable_safe_print
 enable_safe_print()
 
@@ -13,9 +16,6 @@ import json
 import time
 import sys
 from datetime import datetime
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, BASE_DIR)
 
 from engine.notify import send_notify
 from engine.playwright_login import (
