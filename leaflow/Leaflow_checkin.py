@@ -161,11 +161,13 @@ def login(page, email, password):
 
         page.wait_for_selector("#account", timeout=30000)
         page.fill("#account", email)
+        page.wait_for_timeout(5000)
         print("✅ 已输入账号")
 
-        page.wait_for_timeout(1500)
+
         page.wait_for_selector("#password", timeout=30000)
         page.fill("#password", password)
+        page.wait_for_timeout(5000)
         print("✅ 已输入密码")
 
         # 保持登录状态
@@ -177,7 +179,8 @@ def login(page, email, password):
                 print("☑ 已勾选保持登录状态")
         except Exception:
             print("⚠ 未找到保持登录状态按钮")
-
+        page.wait_for_timeout(30000)
+        
         # 登录按钮
         login_btn = page.locator(
             'button[data-slot="button"][type="submit"]',
