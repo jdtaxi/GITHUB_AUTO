@@ -19,16 +19,6 @@ TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 REPO_TOKEN = os.getenv("REPO_TOKEN")
 REPO = os.getenv("GITHUB_REPOSITORY")
 
-raw = os.environ.get("LEAFLOW_ACCOUNTS", "")
-print("🔍 LEAFLOW_ACCOUNTS raw length:", len(raw))
-
-try:
-    ACCOUNTS = json.loads(raw)
-except Exception as e:
-    print("❌ LEAFLOW_ACCOUNTS JSON 解析失败")
-    print(raw)
-    raise
-
 # ================= GitHub SecretUpdater =================
 
 class SecretUpdater:
@@ -153,7 +143,28 @@ def api_checkin(cookies):
         return True, "签到成功"
 
     return False, "签到失败"
+def load_accounts():
+    b64 = os.environ.get("LEAFLOW_ACCOUNTS", "").strip()
 
+    if not b64:
+        raise RuntimeError("❌ 未设置 LEAFLOW_ACCOUNTS")
+
+    try:
+        raw = base64.b64decode(b64).decode("utf-8")
+    except Exception as e:
+        raise RuntimeError(f"❌ Base64 解码失败: {e}")
+
+    print(f"🔍 accounts json length: {len(raw)}")
+
+    try:
+        data = json.loads(raw)
+    except Exception as e:
+        raise RuntimeError(f"❌ JSON 解析失败: {e}")
+
+    if not isinstance(data, dict):
+        raise RuntimeError("❌ accounts 必须是 dict")
+
+    return data
 # ================= 单账号流程 =================
 
 def process(idx, email, password, cookie_str, updater):
@@ -190,6 +201,7 @@ def process(idx, email, password, cookie_str, updater):
 def main():
     updater = SecretUpdater()
     results = []
+    ACCOUNTS=load_accounts()
 
     for idx, (email, data) in enumerate(ACCOUNTS.items(), 1):
         password, cookie = data
