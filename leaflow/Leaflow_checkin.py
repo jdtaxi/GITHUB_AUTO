@@ -6,7 +6,10 @@ import json
 import time
 import base64
 import requests
-from playwright.sync_api import sync_playwright, TimeoutError
+from datetime import datetime
+from playwright.sync_api import sync_playwright
+
+# ================= 基础配置 =================
 
 LOGIN_URL = "https://leaflow.net/login"
 DASHBOARD_URL = "https://leaflow.net/dashboard"
@@ -24,11 +27,31 @@ def tg_send(text):
         return
     requests.post(
         f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage",
-        json={"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML"},
+        json={
+            "chat_id": TG_CHAT_ID,
+            "text": text,
+            "parse_mode": "HTML"
+        },
         timeout=20
     )
 
-# ================= 账号 / Cookie =================
+
+def tg_send_photo(path, caption=""):
+    if not TG_BOT_TOKEN or not TG_CHAT_ID:
+        return
+    with open(path, "rb") as f:
+        requests.post(
+            f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendPhoto",
+            data={
+                "chat_id": TG_CHAT_ID,
+                "caption": caption,
+                "parse_mode": "HTML"
+            },
+            files={"photo": f},
+            timeout=30
+        )
+
+# ================= 账号 / Cookies =================
 
 def load_accounts():
     raw = os.getenv("LEAFLOW_ACCOUNTS", "").strip()
@@ -66,21 +89,21 @@ def load_cookies():
 
 
 def dump_cookies(cookies_map):
-    parts = []
-    for email, cookies in cookies_map.items():
-        parts.append(f"{email}:{json.dumps(cookies, separators=(',', ':'))}")
-    return ",".join(parts)
+    return ",".join(
+        f"{email}:{json.dumps(cookies, separators=(',', ':'))}"
+        for email, cookies in cookies_map.items()
+    )
 
-# ================= GitHub Secret 更新 =================
+# ================= GitHub Secret 回写 =================
 
 class SecretUpdater:
     def __init__(self, name):
         self.name = name
 
     def update(self, value):
-        if not (REPO_TOKEN and REPO):
+        if not (REPO and REPO_TOKEN):
             print("⚠ 未设置 REPO_TOKEN，跳过 cookies 回写")
-            return False
+            return
 
         headers = {
             "Authorization": f"token {REPO_TOKEN}",
@@ -89,11 +112,12 @@ class SecretUpdater:
 
         r = requests.get(
             f"https://api.github.com/repos/{REPO}/actions/secrets/public-key",
-            headers=headers, timeout=30
+            headers=headers,
+            timeout=30
         )
         if r.status_code != 200:
             print("❌ 获取 GitHub 公钥失败")
-            return False
+            return
 
         from nacl import public, encoding
         key = r.json()
@@ -111,12 +135,10 @@ class SecretUpdater:
         )
 
         print(f"💾 cookies 回写状态: {r.status_code}")
-        return r.status_code in (201, 204)
 
 # ================= Playwright =================
 
 def open_browser():
-    print("🌐 启动浏览器")
     pw = sync_playwright().start()
     browser = pw.chromium.launch(
         headless=True,
@@ -128,103 +150,80 @@ def open_browser():
 
 
 def cookies_ok(page):
-    print("🔍 检查 cookies 是否有效")
     page.goto(DASHBOARD_URL, timeout=30000)
     time.sleep(2)
-    print(f"📍 当前 URL: {page.url}")
     return "login" not in page.url.lower()
 
+# ================= 登录（最终稳定版） =================
 
-
-def login(page, email, password, screenshot_cb=None):
-    """
-    Leaflow 登录函数（稳定版）
-    - 支持动态密码框
-    - 支持 button checkbox 记住登录
-    - 失败截图
-    """
-
-    print(f"\n🔐 开始登录: {email}")
-
-    # 打开登录页
-    page.goto(LOGIN_URL, timeout=30000)
-    print("➡ 已打开登录页")
+def login(page, email, password):
+    print(f"\n🔐 登录账号: {email}")
 
     try:
-        # ===== 账号输入框 =====
+        page.goto(LOGIN_URL, timeout=30000)
+        page.wait_for_load_state("domcontentloaded")
+
         page.wait_for_selector("#account", timeout=30000)
         page.fill("#account", email)
-        print("✅ 已输入账号")
 
-        # ===== 等待 JS 渲染密码框 =====
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(1500)
         page.wait_for_selector("#password", timeout=30000)
         page.fill("#password", password)
-        print("✅ 已输入密码")
 
-        # ===== 勾选“保持登录状态” =====
+        # 保持登录状态（button checkbox）
         try:
-            remember = page.locator("#remember")
+            remember = page.locator('button[data-slot="checkbox"]')
             remember.wait_for(state="visible", timeout=5000)
-
             if remember.get_attribute("aria-checked") != "true":
                 remember.click()
-                print("☑️ 已勾选保持登录状态")
-            else:
-                print("ℹ️ 已是保持登录状态")
-
         except Exception:
-            print("⚠️ 未找到保持登录状态按钮，跳过")
+            pass
 
-        # ===== 提交登录 =====
-        page.click('button[type="submit"]')
-        print("➡ 已提交登录")
+        # 登录 / 注册 按钮
+        login_btn = page.locator(
+            'button[data-slot="button"][type="submit"]',
+            has_text="登录"
+        )
+        login_btn.wait_for(state="visible", timeout=10000)
+        login_btn.click()
 
         page.wait_for_load_state("networkidle", timeout=30000)
 
-        # ===== 判断是否成功 =====
         if "login" in page.url.lower():
-            raise RuntimeError("登录失败，仍停留在登录页")
+            raise RuntimeError("登录提交失败")
 
-        # 额外校验 Dashboard
         page.goto(DASHBOARD_URL, timeout=30000)
-        page.wait_for_timeout(2000)
-
         if "login" in page.url.lower():
-            raise RuntimeError("登录失败，Dashboard 校验未通过")
+            raise RuntimeError("Dashboard 校验失败")
 
         print("🎉 登录成功")
 
     except Exception as e:
-        print(f"❌ 登录异常: {e}")
+        img = f"leaflow_login_fail_{email.replace('@','_')}.png"
+        page.screenshot(path=img, full_page=True)
 
-        # 截图（给 TG 用）
-        try:
-            img = f"leaflow_login_fail.png"
-            page.screenshot(path=img, full_page=True)
-            print(f"📸 已截图: {img}")
-
-            if screenshot_cb:
-                screenshot_cb(
-                    img,
-                    f"❌ Leaflow 登录失败\n👤 {email}\n🕒 {datetime.now():%F %T}"
-                )
-        except Exception:
-            print("⚠️ 截图失败")
-
+        tg_send_photo(
+            img,
+            f"❌ <b>Leaflow 登录失败</b>\n"
+            f"👤 {email}\n"
+            f"🕒 {datetime.now():%F %T}\n"
+            f"{e}"
+        )
         raise
 
 # ================= API 签到 =================
 
 def api_checkin(cookies):
-    print("📡 API 签到请求")
     s = requests.Session()
     for c in cookies:
-        s.cookies.set(c["name"], c["value"], domain=c.get("domain"))
+        s.cookies.set(
+            c["name"],
+            c["value"],
+            domain=c.get("domain"),
+            path="/"
+        )
 
     r = s.post(CHECKIN_API, timeout=20)
-    print(f"📥 API 返回码: {r.status_code}")
-
     if r.status_code != 200:
         return False, "接口异常"
 
@@ -239,31 +238,25 @@ def process_account(email, password, cookies_map):
 
     try:
         if email in cookies_map:
-            print(f"🍪 尝试复用 cookies: {email}")
-            try:
-                ctx.add_cookies(cookies_map[email])
-                if cookies_ok(page):
-                    note = "cookies复用"
-                else:
-                    raise Exception
-            except Exception:
-                print("♻ cookies 失效，重新登录")
-                login(page, email, password)
-                note = "cookies失效重登"
+            ctx.add_cookies(cookies_map[email])
+            if cookies_ok(page):
+                note = "cookies复用"
+            else:
+                raise Exception
         else:
-            print("🆕 无 cookies，首次登录")
-            login(page, email, password)
-            note = "首次登录"
+            raise Exception
 
-        cookies_map[email] = ctx.cookies()
-        ok, msg = api_checkin(cookies_map[email])
-        print(f"📊 签到结果: {ok} | {msg}")
-        return ok, f"{note} | {msg}"
+    except Exception:
+        login(page, email, password)
+        note = "重新登录"
 
-    finally:
-        browser.close()
-        pw.stop()
-        print("🧹 浏览器关闭")
+    cookies_map[email] = ctx.cookies()
+    ok, msg = api_checkin(cookies_map[email])
+
+    browser.close()
+    pw.stop()
+
+    return ok, f"{note} | {msg}"
 
 # ================= Main =================
 
@@ -273,13 +266,10 @@ def main():
     results = []
 
     for email, pwd in accounts.items():
-        print("=" * 60)
-        print(f"👤 开始处理账号: {email}")
         try:
             ok, msg = process_account(email, pwd, cookies_map)
             results.append(f"{'✅' if ok else '❌'} {email} — {msg}")
         except Exception as e:
-            print(f"🔥 异常: {e}")
             results.append(f"❌ {email} — {e}")
 
     SecretUpdater("LEAFLOW_COOKIES").update(
