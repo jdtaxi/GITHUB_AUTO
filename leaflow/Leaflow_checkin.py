@@ -9,7 +9,11 @@ Leaflow Playwright + API 自动签到
 import os
 import json
 import time
+import sys
 from datetime import datetime
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BASE_DIR)
 
 from engine.notify import send_notify
 from engine.playwright_login import (
