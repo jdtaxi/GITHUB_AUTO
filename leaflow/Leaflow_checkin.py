@@ -139,6 +139,7 @@ class SecretUpdater:
 # ================= Playwright =================
 
 def open_browser():
+    print("🌐 启动浏览器")
     pw = sync_playwright().start()
     browser = pw.chromium.launch(
         headless=True,
@@ -150,14 +151,16 @@ def open_browser():
 
 
 def cookies_ok(page):
+    print("🔍 校验 cookies 是否有效")
     page.goto(DASHBOARD_URL, timeout=30000)
     time.sleep(2)
+    print(f"📍 当前 URL: {page.url}")
     return "login" not in page.url.lower()
 
-# ================= 登录（最终稳定版） =================
+# ================= 登录 =================
 
 def login(page, email, password):
-    print(f"\n🔐 登录账号: {email}")
+    print(f"\n🔐 执行登录: {email}")
 
     try:
         page.goto(LOGIN_URL, timeout=30000)
@@ -165,32 +168,36 @@ def login(page, email, password):
 
         page.wait_for_selector("#account", timeout=30000)
         page.fill("#account", email)
+        print("✅ 已输入账号")
 
         page.wait_for_timeout(1500)
         page.wait_for_selector("#password", timeout=30000)
         page.fill("#password", password)
+        print("✅ 已输入密码")
 
-        # 保持登录状态（button checkbox）
+        # 保持登录状态
         try:
             remember = page.locator('button[data-slot="checkbox"]')
             remember.wait_for(state="visible", timeout=5000)
             if remember.get_attribute("aria-checked") != "true":
                 remember.click()
+                print("☑ 已勾选保持登录状态")
         except Exception:
-            pass
+            print("⚠ 未找到保持登录状态按钮")
 
-        # 登录 / 注册 按钮
+        # 登录按钮
         login_btn = page.locator(
             'button[data-slot="button"][type="submit"]',
             has_text="登录"
         )
         login_btn.wait_for(state="visible", timeout=10000)
         login_btn.click()
+        print("➡ 已点击登录按钮")
 
         page.wait_for_load_state("networkidle", timeout=30000)
 
         if "login" in page.url.lower():
-            raise RuntimeError("登录提交失败")
+            raise RuntimeError("登录提交后仍在登录页")
 
         page.goto(DASHBOARD_URL, timeout=30000)
         if "login" in page.url.lower():
@@ -199,6 +206,7 @@ def login(page, email, password):
         print("🎉 登录成功")
 
     except Exception as e:
+        print(f"❌ 登录异常: {e}")
         img = f"leaflow_login_fail_{email.replace('@','_')}.png"
         page.screenshot(path=img, full_page=True)
 
@@ -207,6 +215,7 @@ def login(page, email, password):
             f"❌ <b>Leaflow 登录失败</b>\n"
             f"👤 {email}\n"
             f"🕒 {datetime.now():%F %T}\n"
+            f"📍 {page.url}\n"
             f"{e}"
         )
         raise
@@ -214,6 +223,7 @@ def login(page, email, password):
 # ================= API 签到 =================
 
 def api_checkin(cookies):
+    print("📡 发送签到请求")
     s = requests.Session()
     for c in cookies:
         s.cookies.set(
@@ -224,39 +234,60 @@ def api_checkin(cookies):
         )
 
     r = s.post(CHECKIN_API, timeout=20)
+    print(f"📥 接口返回码: {r.status_code}")
+
     if r.status_code != 200:
         return False, "接口异常"
 
     j = r.json()
     return j.get("success", False), j.get("message", "未知返回")
 
-# ================= 主流程 =================
+# ================= 单账号流程（最终修正版） =================
 
 def process_account(email, password, cookies_map):
+    print("=" * 60)
+    print(f"👤 开始处理账号: {email}")
+
     pw, browser, ctx, page = open_browser()
     note = ""
 
     try:
-        if email in cookies_map:
-            ctx.add_cookies(cookies_map[email])
-            if cookies_ok(page):
-                note = "cookies复用"
+        try:
+            if email in cookies_map:
+                print("🍪 尝试复用 cookies")
+                ctx.add_cookies(cookies_map[email])
+
+                if cookies_ok(page):
+                    print("✅ cookies 有效")
+                    note = "cookies复用"
+                else:
+                    print("♻ cookies 失效")
+                    raise Exception
             else:
+                print("🆕 未发现 cookies")
                 raise Exception
-        else:
-            raise Exception
 
-    except Exception:
-        login(page, email, password)
-        note = "重新登录"
+            print("🔄 同步浏览器 cookies")
+            cookies_map[email] = ctx.cookies()
 
-    cookies_map[email] = ctx.cookies()
-    ok, msg = api_checkin(cookies_map[email])
+        except Exception:
+            print("🔐 进入登录流程")
+            login(page, email, password)
 
-    browser.close()
-    pw.stop()
+            print("🔄 登录后同步 cookies")
+            cookies_map[email] = ctx.cookies()
+            note = "重新登录"
 
-    return ok, f"{note} | {msg}"
+        print("📡 开始执行签到")
+        ok, msg = api_checkin(cookies_map[email])
+        print(f"📊 签到结果: {ok} | {msg}")
+
+        return ok, f"{note} | {msg}"
+
+    finally:
+        print("🧹 关闭浏览器")
+        browser.close()
+        pw.stop()
 
 # ================= Main =================
 
@@ -270,6 +301,7 @@ def main():
             ok, msg = process_account(email, pwd, cookies_map)
             results.append(f"{'✅' if ok else '❌'} {email} — {msg}")
         except Exception as e:
+            print(f"🔥 账号异常: {e}")
             results.append(f"❌ {email} — {e}")
 
     SecretUpdater("LEAFLOW_COOKIES").update(
