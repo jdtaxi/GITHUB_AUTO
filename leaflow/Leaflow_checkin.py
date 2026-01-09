@@ -1,53 +1,43 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Leaflow Playwright 登录 + API 签到
-- cookies 存储到 GitHub Actions Secrets
-- cookies 失效自动刷新
-"""
-
 import os
 import json
 import time
 import base64
 import re
 import requests
+from datetime import datetime
 from playwright.sync_api import sync_playwright
-
-# ================= 基础配置 =================
 
 LOGIN_URL = "https://leaflow.net/login"
 DASHBOARD_URL = "https://leaflow.net/dashboard"
 CHECKIN_URL = "https://checkin.leaflow.net"
 
-EMAIL = os.getenv("LEAFLOW_EMAIL")
-PASSWORD = os.getenv("LEAFLOW_PASSWORD")
-SECRET_COOKIES = os.getenv("LEAFLOW_COOKIES", "").strip()
+TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
+TG_CHAT_ID = os.getenv("TG_CHAT_ID")
+REPO_TOKEN = os.getenv("REPO_TOKEN")
+REPO = os.getenv("GITHUB_REPOSITORY")
 
-# ================= GitHub Secret 更新器 =================
+ACCOUNTS_RAW = os.getenv("LEAFLOW_ACCOUNTS", "{}")
+ACCOUNTS = json.loads(ACCOUNTS_RAW)
+
+# ================= GitHub SecretUpdater =================
 
 class SecretUpdater:
-    def __init__(self):
-        self.token = os.environ.get("REPO_TOKEN")
-        self.repo = os.environ.get("GITHUB_REPOSITORY")
-        self.ok = bool(self.token and self.repo)
-
-    def update(self, name, value):
-        if not self.ok:
-            print("⚠️ 未配置 REPO_TOKEN，无法自动更新 Secret")
+    def update(self, value):
+        if not (REPO_TOKEN and REPO):
             return False
-
         try:
             from nacl import encoding, public
 
             headers = {
-                "Authorization": f"token {self.token}",
+                "Authorization": f"token {REPO_TOKEN}",
                 "Accept": "application/vnd.github.v3+json"
             }
 
             r = requests.get(
-                f"https://api.github.com/repos/{self.repo}/actions/secrets/public-key",
+                f"https://api.github.com/repos/{REPO}/actions/secrets/public-key",
                 headers=headers, timeout=30
             )
             if r.status_code != 200:
@@ -58,7 +48,7 @@ class SecretUpdater:
             encrypted = public.SealedBox(pk).encrypt(value.encode())
 
             r = requests.put(
-                f"https://api.github.com/repos/{self.repo}/actions/secrets/{name}",
+                f"https://api.github.com/repos/{REPO}/actions/secrets/LEAFLOW_ACCOUNTS",
                 headers=headers,
                 json={
                     "encrypted_value": base64.b64encode(encrypted).decode(),
@@ -67,49 +57,50 @@ class SecretUpdater:
                 timeout=30
             )
             return r.status_code in (201, 204)
-
-        except Exception as e:
-            print("❌ 更新 Secret 失败:", e)
+        except:
             return False
 
-# ================= Playwright 登录 =================
+# ================= Telegram =================
 
-def launch_browser():
+def tg_msg(text):
+    if not TG_BOT_TOKEN or not TG_CHAT_ID:
+        return
+    requests.post(
+        f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage",
+        json={"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML"},
+        timeout=20
+    )
+
+def tg_photo(path, caption):
+    if not TG_BOT_TOKEN or not TG_CHAT_ID:
+        return
+    with open(path, "rb") as f:
+        requests.post(
+            f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendPhoto",
+            data={"chat_id": TG_CHAT_ID, "caption": caption[:1024]},
+            files={"photo": f},
+            timeout=30
+        )
+
+# ================= Playwright =================
+
+def open_browser():
     pw = sync_playwright().start()
     browser = pw.chromium.launch(headless=True, args=["--no-sandbox"])
-    context = browser.new_context()
-    page = context.new_page()
-    return pw, browser, context, page
+    ctx = browser.new_context()
+    page = ctx.new_page()
+    return pw, browser, ctx, page
 
-
-def load_cookies_from_secret(context):
-    if not SECRET_COOKIES:
-        return False
-
-    try:
-        cookies = json.loads(SECRET_COOKIES)
-        context.add_cookies(cookies)
-        print("🍪 已从 Secret 加载 cookies")
-        return True
-    except Exception:
-        return False
-
-
-def cookies_valid(page):
+def cookies_ok(page):
     page.goto(DASHBOARD_URL, timeout=30000)
-    time.sleep(3)
+    page.wait_for_timeout(2000)
     return "login" not in page.url.lower()
 
-
-def login_leaflow(page):
-    print("🔐 使用账号密码登录")
+def login(page, email, password, idx):
     page.goto(LOGIN_URL, timeout=30000)
-    page.wait_for_timeout(3000)
+    page.fill("input[type=email]", email)
+    page.fill("input[type=password]", password)
 
-    page.fill("input[type=email]", EMAIL)
-    page.fill("input[type=password]", PASSWORD)
-
-    # 记住我
     try:
         cb = page.locator("input[type=checkbox]").first
         if cb.is_visible() and not cb.is_checked():
@@ -121,93 +112,97 @@ def login_leaflow(page):
     page.wait_for_load_state("networkidle", timeout=30000)
 
     if "login" in page.url.lower():
-        raise RuntimeError("登录失败")
+        img = f"login_fail_{idx}.png"
+        page.screenshot(path=img, full_page=True)
+        tg_photo(
+            img,
+            f"❌ <b>Leaflow 登录失败</b>\n👤 {email}\n🕒 {datetime.now():%F %T}"
+        )
+        raise RuntimeError("login failed")
 
-    print("✅ 登录成功")
+# ================= API Checkin =================
 
+def api_checkin(cookies):
+    s = requests.Session()
+    for c in cookies:
+        if "leaflow" in c["domain"]:
+            s.cookies.set(c["name"], c["value"])
 
-def save_cookies_to_secret(context):
-    cookies = context.cookies()
-    value = json.dumps(cookies)
+    r = s.get(CHECKIN_URL, timeout=30)
+    if "已签到" in r.text:
+        return True, "今日已签到"
 
-    updater = SecretUpdater()
-    if updater.update("LEAFLOW_COOKIES", value):
-        print("✅ cookies 已更新到 GitHub Secrets")
-    else:
-        print("⚠️ cookies 更新失败")
+    token = None
+    m = re.search(r'name="_token".*?value="([^"]+)"', r.text)
+    if m:
+        token = m.group(1)
 
+    data = {"checkin": "1"}
+    if token:
+        data["_token"] = token
 
-def ensure_login_and_get_cookies():
-    pw, browser, context, page = launch_browser()
+    r = s.post(CHECKIN_URL, data=data, timeout=30)
+    if any(x in r.text for x in ["成功", "签到", "完成"]):
+        return True, "签到成功"
+
+    return False, "签到失败"
+
+# ================= 单账号流程 =================
+
+def process(idx, email, password, cookie_str, updater):
+    pw, browser, ctx, page = open_browser()
+
     try:
-        if load_cookies_from_secret(context) and cookies_valid(page):
-            print("✅ cookies 登录有效")
+        note = ""
+        if cookie_str:
+            try:
+                ctx.add_cookies(json.loads(cookie_str))
+                if cookies_ok(page):
+                    note = "🍪 cookies复用"
+                else:
+                    raise Exception
+            except:
+                login(page, email, password, idx)
+                note = "♻ cookies失效重登"
         else:
-            print("♻ cookies 无效，重新登录")
-            login_leaflow(page)
-            save_cookies_to_secret(context)
+            login(page, email, password, idx)
+            note = "🔐 首次登录"
 
-        return {
-            "cookies": {
-                c["name"]: c["value"]
-                for c in context.cookies()
-                if "leaflow" in c.get("domain", "")
-            }
-        }
+        cookies = ctx.cookies()
+        ACCOUNTS[email][1] = json.dumps(cookies)
+
+        ok, msg = api_checkin(cookies)
+        return ok, f"{note} | {msg}"
+
     finally:
         browser.close()
         pw.stop()
 
-# ================= API 签到 =================
-
-class LeaflowCheckinAPI:
-
-    def __init__(self):
-        self.session = requests.Session()
-
-    def load_cookies(self, cookies):
-        for k, v in cookies.items():
-            self.session.cookies.set(k, v)
-
-    def run(self, cookies):
-        self.load_cookies(cookies)
-
-        r = self.session.get(CHECKIN_URL, timeout=30)
-        if r.status_code != 200:
-            return False, "签到页访问失败"
-
-        if "已签到" in r.text or "already" in r.text.lower():
-            return True, "今日已签到"
-
-        token = None
-        m = re.search(r'name="_token".*?value="([^"]+)"', r.text)
-        if m:
-            token = m.group(1)
-
-        data = {"checkin": "1"}
-        if token:
-            data["_token"] = token
-
-        r = self.session.post(CHECKIN_URL, data=data, timeout=30)
-        if "成功" in r.text or "success" in r.text.lower():
-            return True, "签到成功"
-
-        return False, "签到失败"
-
-# ================= 主入口 =================
+# ================= Main =================
 
 def main():
-    if not EMAIL or not PASSWORD:
-        raise RuntimeError("缺少 LEAFLOW_EMAIL / LEAFLOW_PASSWORD")
+    updater = SecretUpdater()
+    results = []
 
-    cookie_data = ensure_login_and_get_cookies()
-    api = LeaflowCheckinAPI()
-    ok, msg = api.run(cookie_data["cookies"])
+    for idx, (email, data) in enumerate(ACCOUNTS.items(), 1):
+        password, cookie = data
+        try:
+            ok, msg = process(idx, email, password, cookie, updater)
+            results.append((email, ok, msg))
+        except Exception as e:
+            results.append((email, False, str(e)))
 
-    print("🎯 签到结果:", msg)
-    if not ok:
+    updater.update(json.dumps(ACCOUNTS))
+
+    text = "🍃 <b>Leaflow 多账号签到汇总</b>\n\n"
+    for email, ok, msg in results:
+        text += f"{'✅' if ok else '❌'} {email[:3]}***{email[email.find('@'):]}：{msg}\n"
+    text += f"\n🕒 {datetime.now():%F %T}"
+
+    tg_msg(text)
+
+    if not all(x[1] for x in results):
         exit(1)
-
 
 if __name__ == "__main__":
     main()
