@@ -24,5 +24,6 @@ jobs:
         env:
           TG_APIS: ${{ secrets.TG_APIS }}
           TG_SESSIONS: ${{ secrets.TG_SESSIONS }}
+          PROXIES: ${{ secrets.PROXIES }}
         run: |
           python icmp9.py
