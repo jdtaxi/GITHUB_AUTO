@@ -305,7 +305,8 @@ def main():
             results.append(f"❌ {email} — {e}")
 
     SecretUpdater("LEAFLOW_COOKIES").update(
-        dump_cookies(cookies_map)
+        #dump_cookies(cookies_map)
+        json.dumps(cookies_map, ensure_ascii=False)
     )
 
     tg_send("📋 <b>Leaflow 签到汇总</b>\n\n" + "\n".join(results))
