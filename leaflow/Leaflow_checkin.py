@@ -5,6 +5,8 @@
 Leaflow Playwright + API 自动签到
 依赖 engine 目录中的模块
 """
+from engine.safe_print import enable_safe_print
+enable_safe_print()
 
 import os
 import json
