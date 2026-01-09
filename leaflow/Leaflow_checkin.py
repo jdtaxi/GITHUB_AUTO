@@ -19,8 +19,15 @@ TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 REPO_TOKEN = os.getenv("REPO_TOKEN")
 REPO = os.getenv("GITHUB_REPOSITORY")
 
-ACCOUNTS_RAW = os.getenv("LEAFLOW_ACCOUNTS", "{}")
-ACCOUNTS = json.loads(ACCOUNTS_RAW)
+raw = os.environ.get("LEAFLOW_ACCOUNTS", "")
+print("🔍 LEAFLOW_ACCOUNTS raw length:", len(raw))
+
+try:
+    ACCOUNTS = json.loads(raw)
+except Exception as e:
+    print("❌ LEAFLOW_ACCOUNTS JSON 解析失败")
+    print(raw)
+    raise
 
 # ================= GitHub SecretUpdater =================
 
