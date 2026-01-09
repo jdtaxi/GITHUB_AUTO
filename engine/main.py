@@ -63,14 +63,42 @@ class SecretUpdater:
 # Session 工厂
 # ==================================================
 
-def session_from_cookies(cookies: dict, headers=None):
+def session_from_cookies(cookies, headers=None):
     print("🧩 [Session] 开始从 cookies 构建 session")
 
     session = requests.Session()
 
-    for k, v in cookies.items():
-        session.cookies.set(k, v)
-        print(f"🍪 [Session] 注入 cookie: {k}")
+    # ---------- Playwright cookies（list） ----------
+    if isinstance(cookies, list):
+        print(f"📦 [Session] 检测到 Playwright cookies，数量: {len(cookies)}")
+        for c in cookies:
+            name = c.get("name")
+            value = c.get("value")
+            domain = c.get("domain")
+            path = c.get("path", "/")
+
+            if not name or value is None:
+                print(f"⚠ 跳过非法 cookie: {c}")
+                continue
+
+            session.cookies.set(
+                name,
+                value,
+                domain=domain,
+                path=path
+            )
+            print(f"🍪 [Session] 注入 cookie: {name}")
+
+    # ---------- dict cookies ----------
+    elif isinstance(cookies, dict):
+        print(f"📦 [Session] 检测到 dict cookies，数量: {len(cookies)}")
+        for k, v in cookies.items():
+            session.cookies.set(k, v)
+            print(f"🍪 [Session] 注入 cookie: {k}")
+
+    else:
+        print(f"❌ [Session] 不支持的 cookies 类型: {type(cookies)}")
+        return session
 
     session.headers.update({
         "User-Agent": "Mozilla/5.0",
@@ -83,6 +111,7 @@ def session_from_cookies(cookies: dict, headers=None):
 
     print("✅ [Session] Session 构建完成")
     return session
+
 
 
 # ==================================================
