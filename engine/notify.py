@@ -10,7 +10,7 @@
 
 import os
 import requests
-
+from safe_print import desensitize_text
 
 # =========================
 # 环境变量读取
@@ -108,11 +108,12 @@ def send_notify(title, content, image_path=None):
     print("🔔 开始发送通知")
 
     message = f"<b>{title}</b>\n\n{content}"
-
+    message = desensitize_text(message)
     ok_text = send_telegram_text(message)
 
     ok_img = True
     if image_path:
+        title = desensitize_text(title)
         ok_img = send_telegram_image(image_path, caption=title)
 
     return ok_text and ok_img
