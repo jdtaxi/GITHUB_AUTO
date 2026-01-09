@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-通知依赖模块
-支持：
-- Telegram 文字
-- Telegram 图片（本地文件）
+通知依赖模块（Telegram）
+- 自动读取 GitHub Actions / 系统环境变量
+- 支持文字
+- 支持图片
 """
 
 import os
@@ -13,18 +13,38 @@ import requests
 
 
 # =========================
-# Telegram 通知
+# 环境变量读取
 # =========================
 
-def send_telegram_text(bot_token, chat_id, text):
-    """
-    发送 Telegram 文字消息
-    """
+TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
+TG_CHAT_ID = os.getenv("TG_CHAT_ID")
+
+
+def _check_env():
+    print("🔍 检查 Telegram 环境变量")
+    if not TG_BOT_TOKEN:
+        print("❌ 未检测到 TG_BOT_TOKEN")
+        return False
+    if not TG_CHAT_ID:
+        print("❌ 未检测到 TG_CHAT_ID")
+        return False
+    print("✅ Telegram 环境变量正常")
+    return True
+
+
+# =========================
+# Telegram 文字
+# =========================
+
+def send_telegram_text(text):
+    if not _check_env():
+        return False
+
     print("📨 [TG] 发送文字通知")
 
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": chat_id,
+        "chat_id": TG_CHAT_ID,
         "text": text,
         "parse_mode": "HTML",
         "disable_web_page_preview": True,
@@ -34,27 +54,31 @@ def send_telegram_text(bot_token, chat_id, text):
         r = requests.post(url, data=payload, timeout=30)
         print(f"⬅️ [TG] HTTP {r.status_code}")
         if not r.ok:
-            print(f"❌ [TG] 发送失败: {r.text}")
+            print(f"❌ [TG] 失败响应: {r.text}")
         return r.ok
     except Exception as e:
         print(f"💥 [TG] 异常: {e}")
         return False
 
 
-def send_telegram_image(bot_token, chat_id, image_path, caption=None):
-    """
-    发送 Telegram 图片（本地文件）
-    """
+# =========================
+# Telegram 图片
+# =========================
+
+def send_telegram_image(image_path, caption=None):
+    if not _check_env():
+        return False
+
     print(f"🖼️ [TG] 发送图片: {image_path}")
 
     if not os.path.exists(image_path):
         print("❌ 图片文件不存在")
         return False
 
-    url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
+    url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendPhoto"
 
     data = {
-        "chat_id": chat_id,
+        "chat_id": TG_CHAT_ID,
     }
     if caption:
         data["caption"] = caption
@@ -66,7 +90,7 @@ def send_telegram_image(bot_token, chat_id, image_path, caption=None):
 
         print(f"⬅️ [TG] HTTP {r.status_code}")
         if not r.ok:
-            print(f"❌ [TG] 发送失败: {r.text}")
+            print(f"❌ [TG] 失败响应: {r.text}")
         return r.ok
     except Exception as e:
         print(f"💥 [TG] 异常: {e}")
@@ -74,16 +98,10 @@ def send_telegram_image(bot_token, chat_id, image_path, caption=None):
 
 
 # =========================
-# 统一调用入口（推荐）
+# 统一通知入口（推荐）
 # =========================
 
-def send_notify(
-    title,
-    content,
-    tg_bot_token=None,
-    tg_chat_id=None,
-    image_path=None,
-):
+def send_notify(title, content, image_path=None):
     """
     统一通知入口
     """
@@ -91,23 +109,10 @@ def send_notify(
 
     message = f"<b>{title}</b>\n\n{content}"
 
-    if not tg_bot_token or not tg_chat_id:
-        print("⚠️ 未配置 Telegram，跳过通知")
-        return False
-
-    ok_text = send_telegram_text(
-        tg_bot_token,
-        tg_chat_id,
-        message
-    )
+    ok_text = send_telegram_text(message)
 
     ok_img = True
     if image_path:
-        ok_img = send_telegram_image(
-            tg_bot_token,
-            tg_chat_id,
-            image_path,
-            caption=title
-        )
+        ok_img = send_telegram_image(image_path, caption=title)
 
     return ok_text and ok_img
