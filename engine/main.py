@@ -15,13 +15,13 @@ REPO_TOKEN = os.getenv("REPO_TOKEN")
 class SecretUpdater:
     def __init__(self, name):
         self.name = name
-        print(f"🔐 [SecretUpdater] 初始化，secret 名称 = {name}")
+        print(f"🔐 初始化，secret 名称 = {name}")
 
     def update(self, value):
-        print("📝 [SecretUpdater] 准备回写 GitHub Secret")
+        print("📝 准备回写 GitHub Secret")
 
         if not REPO or not REPO_TOKEN:
-            print("⚠ [SecretUpdater] 未配置 GITHUB_REPOSITORY / REPO_TOKEN，跳过")
+            print("⚠ 未配置 GITHUB_REPOSITORY / REPO_TOKEN，跳过")
             return
 
         headers = {
@@ -29,23 +29,23 @@ class SecretUpdater:
             "Accept": "application/vnd.github.v3+json"
         }
 
-        print(f"🌐 [SecretUpdater] 获取公钥: {REPO}")
+        print(f"🌐 获取公钥: {REPO}")
         r = requests.get(
             f"https://api.github.com/repos/{REPO}/actions/secrets/public-key",
             headers=headers,
             timeout=30
         )
 
-        print(f"⬅️ [SecretUpdater] 公钥接口返回 {r.status_code}")
+        print(f"⬅️ 公钥接口返回 {r.status_code}")
         r.raise_for_status()
 
         key = r.json()
 
-        print("🔑 [SecretUpdater] 开始加密 Secret")
+        print("🔑 开始加密 Secret")
         pk = public.PublicKey(key["key"].encode(), encoding.Base64Encoder())
         encrypted = public.SealedBox(pk).encrypt(value.encode())
 
-        print(f"📤 [SecretUpdater] 提交 Secret: {self.name}")
+        print(f"📤 提交 Secret: {self.name}")
         r = requests.put(
             f"https://api.github.com/repos/{REPO}/actions/secrets/{self.name}",
             headers=headers,
@@ -56,7 +56,7 @@ class SecretUpdater:
             timeout=30
         )
 
-        print(f"✅ [SecretUpdater] 回写完成，HTTP {r.status_code}")
+        print(f"✅ 回写完成，HTTP {r.status_code}")
 
 
 # ==================================================
@@ -86,23 +86,48 @@ def session_from_cookies(cookies: dict, headers=None):
 
 
 # ==================================================
-# 对外统一签到入口
+# 对外统一签到入口（带参数完整性检查）
 # ==================================================
 
 def perform_token_checkin(
     cookies: dict,
     account_name: str,
-    checkin_url: str,
-    main_site: str,
+    checkin_url: str = None,
+    main_site: str = None,
     headers=None,
 ):
     print("=" * 60)
     print(f"🚀 [{account_name}] perform_token_checkin 入口")
-    print(f"🔗 checkin_url = {checkin_url}")
-    print(f"🏠 main_site  = {main_site}")
 
+    # ---------- 参数完整性检查 ----------
+    missing = []
+
+    if not cookies:
+        missing.append("cookies")
+    if not account_name:
+        missing.append("account_name")
+    if not checkin_url:
+        missing.append("checkin_url")
+    if not main_site:
+        missing.append("main_site")
+
+    if missing:
+        print("❗❗❗ 参数不完整警告 ❗❗❗")
+        print(f"❌ 缺失参数: {', '.join(missing)}")
+        print("⚠ 本次签到流程已跳过（不会发送任何请求）")
+        print("=" * 60)
+        return False, f"参数不完整: {', '.join(missing)}"
+
+    # ---------- 参数打印 ----------
+    print(f"👤 account_name = {account_name}")
+    print(f"🔗 checkin_url  = {checkin_url}")
+    print(f"🏠 main_site   = {main_site}")
+    print(f"🍪 cookies 数量 = {len(cookies)}")
+
+    # ---------- 构建 Session ----------
     session = session_from_cookies(cookies, headers=headers)
 
+    # ---------- 执行签到 ----------
     result = perform_checkin(
         session=session,
         account_name=account_name,
@@ -131,7 +156,7 @@ def perform_checkin(session, account_name, checkin_url, main_site):
             ok, msg = analyze_and_checkin(
                 session, resp.text, checkin_url, account_name
             )
-            print(f"📊 [STEP1] 分析结果: {ok}, {msg}")
+            print(f"📊 [STEP1] 解析结果: {ok}, {msg}")
             if ok:
                 return True, msg
 
@@ -151,7 +176,7 @@ def perform_checkin(session, account_name, checkin_url, main_site):
                 print(f"⬅️ [API] GET {r.status_code}")
                 if r.status_code == 200:
                     ok, msg = check_checkin_response(r.text)
-                    print(f"📊 [API] GET 解析结果: {ok}, {msg}")
+                    print(f"📊 [API] GET 解析: {ok}, {msg}")
                     if ok:
                         return True, msg
             except Exception as e:
@@ -163,7 +188,7 @@ def perform_checkin(session, account_name, checkin_url, main_site):
                 print(f"⬅️ [API] POST {r.status_code}")
                 if r.status_code == 200:
                     ok, msg = check_checkin_response(r.text)
-                    print(f"📊 [API] POST 解析结果: {ok}, {msg}")
+                    print(f"📊 [API] POST 解析: {ok}, {msg}")
                     if ok:
                         return True, msg
             except Exception as e:
