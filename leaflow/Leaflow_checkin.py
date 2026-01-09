@@ -103,7 +103,7 @@ def process_account(email, password, cookies_map):
     # ---------- API 签到 ----------
     print("📡 执行 API 签到")
     ok, msg = perform_token_checkin(cookies_map[email], email)
-
+    print(f"ℹ️ API 签到: {ok},{msg}")
     return ok, f"{note} | {msg}"
 
 
