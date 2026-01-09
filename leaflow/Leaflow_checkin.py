@@ -68,21 +68,15 @@ def load_accounts():
 
 
 def load_cookies():
-    raw = os.getenv("LEAFLOW_COOKIES", "").strip()
-    cookies = {}
-
+    raw = os.getenv("LEAFLOW_COOKIES")
+    cookies=None
     if not raw:
-        print("🍪 未设置 LEAFLOW_COOKIES")
-        return cookies
+        raise RuntimeError("❌ 未设置 LEAFLOW_COOKIES 环境变量")
 
-    for item in raw.split(","):
-        if ":" not in item:
-            continue
-        email, cookie_json = item.split(":", 1)
-        try:
-            cookies[email.strip()] = json.loads(cookie_json)
-        except Exception:
-            print(f"⚠ cookies 解析失败: {email}")
+    try:
+        cookies = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"❌ LEAFLOW_COOKIES 不是合法 JSON: {e}")
 
     print(f"🍪 已加载 cookies 数: {len(cookies)}")
     return cookies
