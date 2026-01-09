@@ -1,8 +1,44 @@
-
 # -*- coding: utf-8 -*-
-
-import re
+import os
+import base64
 import requests
+from nacl import public, encoding
+
+REPO = os.getenv("GITHUB_REPOSITORY")
+REPO_TOKEN = os.getenv("REPO_TOKEN")
+
+# engine/github_secret.py
+class SecretUpdater:
+    def __init__(self, name):
+        self.name = name
+
+    def update(self, value):
+        if not REPO or not REPO_TOKEN:
+            print("⚠ 未配置 GitHub Repo Token，跳过回写")
+            return
+
+        headers = {
+            "Authorization": f"token {REPO_TOKEN}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+
+        r = requests.get(
+            f"https://api.github.com/repos/{REPO}/actions/secrets/public-key",
+            headers=headers
+        )
+        key = r.json()
+
+        pk = public.PublicKey(key["key"].encode(), encoding.Base64Encoder())
+        encrypted = public.SealedBox(pk).encrypt(value.encode())
+
+        requests.put(
+            f"https://api.github.com/repos/{REPO}/actions/secrets/{self.name}",
+            headers=headers,
+            json={
+                "encrypted_value": base64.b64encode(encrypted).decode(),
+                "key_id": key["key_id"]
+            }
+        )
 
 # session_factory
 def session_from_cookies(cookies: dict, headers=None):
