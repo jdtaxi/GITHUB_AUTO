@@ -143,22 +143,28 @@ def api_checkin(cookies):
         return True, "签到成功"
 
     return False, "签到失败"
+    
 def load_accounts():
     b64 = os.environ.get("LEAFLOW_ACCOUNTS", "").strip()
 
     if not b64:
-        raise RuntimeError("❌ 未设置 LEAFLOW_ACCOUNTS")
+        raise RuntimeError("❌ 未读取到 LEAFLOW_ACCOUNTS_B64")
+
+    # Base64 基本校验
+    if not re.fullmatch(r"[A-Za-z0-9+/=]+", b64):
+        raise RuntimeError("❌ LEAFLOW_ACCOUNTS_B64 不是合法 Base64")
 
     try:
-        raw = base64.b64decode(b64).decode("utf-8")
+        raw = base64.b64decode(b64).decode("utf-8", errors="replace")
     except Exception as e:
         raise RuntimeError(f"❌ Base64 解码失败: {e}")
 
-    print(f"🔍 accounts json length: {len(raw)}")
+    print(f"🔍 decoded json length: {len(raw)}")
 
     try:
         data = json.loads(raw)
     except Exception as e:
+        print("❌ decoded raw preview:", repr(raw[:50]))
         raise RuntimeError(f"❌ JSON 解析失败: {e}")
 
     if not isinstance(data, dict):
