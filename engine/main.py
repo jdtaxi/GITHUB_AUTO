@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 import os
 import base64
 import requests
@@ -56,6 +57,29 @@ def session_from_cookies(cookies: dict, headers=None):
 
     print("🧩 Session 已从 Cookie 构建完成")
     return session
+
+def perform_token_checkin(
+    cookies: dict,
+    account_name: str,
+    checkin_url: str,
+    main_site: str,
+    headers=None,
+    printer=print
+):
+    """
+    对外统一签到入口（供 Leaflow_checkin.py 调用）
+    """
+    printer(f"🧩 [{account_name}] 构建 Session 并准备签到")
+
+    session = session_from_cookies(cookies, headers=headers)
+
+    return perform_checkin(
+        session=session,
+        account_name=account_name,
+        checkin_url=checkin_url,
+        main_site=main_site,
+        printer=printer
+    )
 
 # leaflow_checkin_engine
 def perform_checkin(session, account_name, checkin_url, main_site, printer=print):
