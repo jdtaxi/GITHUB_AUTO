@@ -45,10 +45,11 @@ jobs:
 
       - name: ▶️ Run Leaflow Checkin
         env:
-          LEAFLOW_ACCOUNTS: ${{ secrets.LEAFLOW_ACCOUNTS }}
-          REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
-          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+            LEAFLOW_ACCOUNTS: ${{ secrets.LEAFLOW_ACCOUNTS }}
+            LEAFLOW_COOKIES:  ${{ secrets.LEAFLOW_COOKIES }}
+            REPO_TOKEN:       ${{ secrets.REPO_TOKEN }}
+            TG_BOT_TOKEN:     ${{ secrets.TG_BOT_TOKEN }}
+            TG_CHAT_ID:       ${{ secrets.TG_CHAT_ID }}
         run: |
           set -x
           python -u leaflow/Leaflow_checkin.py
