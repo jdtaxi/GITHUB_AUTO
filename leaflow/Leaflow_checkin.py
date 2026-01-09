@@ -6,9 +6,7 @@ import json
 import time
 import base64
 import requests
-from playwright.sync_api import sync_playwright
-
-# ==================== 基础配置 ====================
+from playwright.sync_api import sync_playwright, TimeoutError
 
 LOGIN_URL = "https://leaflow.net/login"
 DASHBOARD_URL = "https://leaflow.net/dashboard"
@@ -16,34 +14,34 @@ CHECKIN_API = "https://leaflow.net/api/checkin"
 
 REPO = os.getenv("GITHUB_REPOSITORY")
 REPO_TOKEN = os.getenv("REPO_TOKEN")
-
 TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
 TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 
-# ==================== Telegram ====================
+# ================= Telegram =================
 
 def tg_send(text):
     if not TG_BOT_TOKEN or not TG_CHAT_ID:
         return
-    url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
-    requests.post(url, json={
-        "chat_id": TG_CHAT_ID,
-        "text": text,
-        "parse_mode": "HTML"
-    }, timeout=20)
+    requests.post(
+        f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage",
+        json={"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML"},
+        timeout=20
+    )
 
-# ==================== 账号 / Cookie 解析 ====================
+# ================= 账号 / Cookie =================
 
 def load_accounts():
     raw = os.getenv("LEAFLOW_ACCOUNTS", "").strip()
     if not raw:
         raise RuntimeError("❌ 未设置 LEAFLOW_ACCOUNTS")
 
-    data = {}
+    accounts = {}
     for item in raw.split(","):
         email, pwd = item.split(":", 1)
-        data[email.strip()] = pwd.strip()
-    return data
+        accounts[email.strip()] = pwd.strip()
+
+    print(f"🔐 读取账号数: {len(accounts)}")
+    return accounts
 
 
 def load_cookies():
@@ -51,6 +49,7 @@ def load_cookies():
     cookies = {}
 
     if not raw:
+        print("🍪 未设置 LEAFLOW_COOKIES")
         return cookies
 
     for item in raw.split(","):
@@ -60,7 +59,9 @@ def load_cookies():
         try:
             cookies[email.strip()] = json.loads(cookie_json)
         except Exception:
-            pass
+            print(f"⚠ cookies 解析失败: {email}")
+
+    print(f"🍪 已加载 cookies 数: {len(cookies)}")
     return cookies
 
 
@@ -70,7 +71,7 @@ def dump_cookies(cookies_map):
         parts.append(f"{email}:{json.dumps(cookies, separators=(',', ':'))}")
     return ",".join(parts)
 
-# ==================== GitHub Secret 更新 ====================
+# ================= GitHub Secret 更新 =================
 
 class SecretUpdater:
     def __init__(self, name):
@@ -78,6 +79,7 @@ class SecretUpdater:
 
     def update(self, value):
         if not (REPO_TOKEN and REPO):
+            print("⚠ 未设置 REPO_TOKEN，跳过 cookies 回写")
             return False
 
         headers = {
@@ -90,6 +92,7 @@ class SecretUpdater:
             headers=headers, timeout=30
         )
         if r.status_code != 200:
+            print("❌ 获取 GitHub 公钥失败")
             return False
 
         from nacl import public, encoding
@@ -106,51 +109,71 @@ class SecretUpdater:
             },
             timeout=30
         )
+
+        print(f"💾 cookies 回写状态: {r.status_code}")
         return r.status_code in (201, 204)
 
-# ==================== Playwright ====================
+# ================= Playwright =================
 
 def open_browser():
+    print("🌐 启动浏览器")
     pw = sync_playwright().start()
-    browser = pw.chromium.launch(headless=True)
+    browser = pw.chromium.launch(
+        headless=True,
+        args=["--no-sandbox", "--disable-dev-shm-usage"]
+    )
     ctx = browser.new_context()
     page = ctx.new_page()
     return pw, browser, ctx, page
 
 
 def cookies_ok(page):
+    print("🔍 检查 cookies 是否有效")
     page.goto(DASHBOARD_URL, timeout=30000)
     time.sleep(2)
+    print(f"📍 当前 URL: {page.url}")
     return "login" not in page.url.lower()
 
 
 def login(page, email, password):
+    print(f"🔐 登录中: {email}")
     page.goto(LOGIN_URL, timeout=30000)
-    page.fill('input[name="email"]', email)
-    page.fill('input[name="password"]', password)
-    page.click('button[type="submit"]')
-    page.wait_for_timeout(3000)
+    print("➡ 已打开登录页")
+
+    try:
+        page.wait_for_selector('input[name="email"]', timeout=30000)
+        page.fill('input[name="email"]', email)
+        page.fill('input[name="password"]', password)
+        page.click('button[type="submit"]')
+        page.wait_for_timeout(3000)
+    except TimeoutError:
+        print("❌ 登录页元素未出现")
+        print(page.content()[:1000])
+        raise
 
     if "login" in page.url.lower():
         raise RuntimeError("登录失败")
 
-# ==================== API 签到 ====================
+    print("✅ 登录成功")
+
+# ================= API 签到 =================
 
 def api_checkin(cookies):
+    print("📡 API 签到请求")
     s = requests.Session()
     for c in cookies:
         s.cookies.set(c["name"], c["value"], domain=c.get("domain"))
 
     r = s.post(CHECKIN_API, timeout=20)
+    print(f"📥 API 返回码: {r.status_code}")
+
     if r.status_code != 200:
         return False, "接口异常"
 
     j = r.json()
-    if j.get("success"):
-        return True, j.get("message", "签到成功")
-    return False, j.get("message", "签到失败")
+    return j.get("success", False), j.get("message", "未知返回")
 
-# ==================== 主流程 ====================
+# ================= 主流程 =================
 
 def process_account(email, password, cookies_map):
     pw, browser, ctx, page = open_browser()
@@ -158,41 +181,47 @@ def process_account(email, password, cookies_map):
 
     try:
         if email in cookies_map:
+            print(f"🍪 尝试复用 cookies: {email}")
             try:
                 ctx.add_cookies(cookies_map[email])
                 if cookies_ok(page):
-                    note = "🍪 cookies复用"
+                    note = "cookies复用"
                 else:
                     raise Exception
-            except:
+            except Exception:
+                print("♻ cookies 失效，重新登录")
                 login(page, email, password)
-                note = "♻ cookies失效重登"
+                note = "cookies失效重登"
         else:
+            print("🆕 无 cookies，首次登录")
             login(page, email, password)
-            note = "🔐 首次登录"
+            note = "首次登录"
 
-        new_cookies = ctx.cookies()
-        cookies_map[email] = new_cookies
-
-        ok, msg = api_checkin(new_cookies)
+        cookies_map[email] = ctx.cookies()
+        ok, msg = api_checkin(cookies_map[email])
+        print(f"📊 签到结果: {ok} | {msg}")
         return ok, f"{note} | {msg}"
 
     finally:
         browser.close()
         pw.stop()
+        print("🧹 浏览器关闭")
 
+# ================= Main =================
 
 def main():
     accounts = load_accounts()
     cookies_map = load_cookies()
-
     results = []
+
     for email, pwd in accounts.items():
+        print("=" * 60)
+        print(f"👤 开始处理账号: {email}")
         try:
             ok, msg = process_account(email, pwd, cookies_map)
-            status = "✅" if ok else "❌"
-            results.append(f"{status} {email} — {msg}")
+            results.append(f"{'✅' if ok else '❌'} {email} — {msg}")
         except Exception as e:
+            print(f"🔥 异常: {e}")
             results.append(f"❌ {email} — {e}")
 
     SecretUpdater("LEAFLOW_COOKIES").update(
