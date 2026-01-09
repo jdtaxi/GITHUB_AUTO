@@ -166,7 +166,7 @@ def main():
                 else:
                     print("❌ 未配置 GH_2FA_SECRET，无法继续", flush=True)
                     shot = save_screenshot(page, "2fa_failed")
-                    send_notify("GitHub 登录失败", "缺少 2FA 密钥", shot)
+                    send_notify("❌ GitHub 登录失败", "缺少 2FA 密钥", shot)
                     return
 
                 time.sleep(3)
@@ -175,7 +175,7 @@ def main():
             if "login" in page.url:
                 print("❌ GitHub 登录失败", flush=True)
                 shot = save_screenshot(page, "login_failed")
-                send_notify("GitHub 登录失败", "登录流程失败", shot)
+                send_notify("❌ GitHub 登录失败", "登录流程失败", shot)
                 return
 
             print("✅ GitHub 登录成功", flush=True)
@@ -195,7 +195,7 @@ def main():
         if not new_session:
             print("❌ 未获取到新的 GH_SESSION", flush=True)
             shot = save_screenshot(page, "session_failed")
-            send_notify("GH_SESSION 更新失败", "未获取到 session", shot)
+            send_notify("❌ GH_SESSION 更新失败", "未获取到 session", shot)
             return
 
         print("🍪 获取新的 user_session", flush=True)
@@ -203,10 +203,10 @@ def main():
 
         if update_github_secret("GH_SESSION", new_session):
             print("✅ GH_SESSION 更新成功", flush=True)
-            send_notify("GH_SESSION 更新成功", f"账号 {masked} 已更新")
+            send_notify("✅ GH_SESSION 更新成功", f"账号 {masked} 已更新")
         else:
             print("❌ GH_SESSION 更新失败", flush=True)
-            send_notify("GH_SESSION 更新失败", "Secret 写入失败")
+            send_notify("❌ GH_SESSION 更新失败", "Secret 写入失败")
 
         browser.close()
 
