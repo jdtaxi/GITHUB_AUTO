@@ -69,18 +69,17 @@ def load_accounts():
 
 def load_cookies():
     raw = os.getenv("LEAFLOW_COOKIES")
-    cookies=None
-    if not raw:
-        raise RuntimeError("❌ 未设置 LEAFLOW_COOKIES 环境变量")
-
-    try:
-        cookies = json.loads(raw)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"❌ LEAFLOW_COOKIES 不是合法 JSON: {e}")
-
-    print(f"🍪 已加载 cookies 数: {len(cookies)}")
+    cookies={}
+    if raw:
+        try:
+            cookies = json.loads(raw)
+            print(f"🍪 已加载 cookies 数: {len(cookies)}")
+            return cookies
+        except json.JSONDecodeError as e:
+            print(f"❌ LEAFLOW_COOKIES 不是合法 JSON: {e}")
+        
+    print("❌ 未设置 LEAFLOW_COOKIES 环境变量，登录获取。。。。")
     return cookies
-
 
 def dump_cookies(cookies_map):
     return ",".join(
