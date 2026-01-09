@@ -50,7 +50,8 @@ jobs:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          python leaflow/Leaflow_checkin.py
+          set -x
+          python -u leaflow/Leaflow_checkin.py
 
       - name: 📸 Upload login fail screenshots
         if: failure()
