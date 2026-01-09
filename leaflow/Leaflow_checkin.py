@@ -14,6 +14,7 @@ from playwright.sync_api import sync_playwright
 LOGIN_URL = "https://leaflow.net/login"
 DASHBOARD_URL = "https://leaflow.net/dashboard"
 CHECKIN_API = "https://leaflow.net/api/checkin"
+USER_API = "https://leaflow.net/api/user"
 
 REPO = os.getenv("GITHUB_REPOSITORY")
 REPO_TOKEN = os.getenv("REPO_TOKEN")
@@ -221,6 +222,13 @@ def login(page, email, password):
 def api_checkin(cookies):
     print("📡 发送签到请求")
     s = requests.Session()
+    s.headers.update({
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json,text/html,*/*",
+        "Accept-Language": "zh-CN,zh;q=0.9",
+        "Referer": "https://leaflow.net/",
+        "Connection": "keep-alive",
+    })
     for c in cookies:
         s.cookies.set(
             c["name"],
