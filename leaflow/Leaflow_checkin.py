@@ -30,8 +30,17 @@ from engine.main import (
 
 LOGIN_URL = "https://leaflow.net/login"
 DASHBOARD_URL = "https://leaflow.net/dashboard"
-
-
+checkin_url = "https://checkin.leaflow.net"
+main_site = "https://leaflow.net"
+headers={
+    'User-Agent': self.config['settings']['user_agent'],
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'DNT': '1',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+        }
 # ================= 账号 / Cookies =================
 
 def load_accounts():
@@ -102,7 +111,7 @@ def process_account(email, password, cookies_map):
 
     # ---------- API 签到 ----------
     print("📡 执行 API 签到")
-    ok, msg = perform_token_checkin(cookies_map[email], email)
+    ok, msg = perform_token_checkin(cookies_map[email], email, checkin_url, main_site,headers)
     print(f"ℹ️ API 签到: {ok},{msg}")
     return ok, f"{note} | {msg}"
 
