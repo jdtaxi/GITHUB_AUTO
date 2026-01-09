@@ -1,0 +1,61 @@
+name: Leaflow Multi-Account Checkin
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 每天北京时间 08:05（UTC 00:05）
+    - cron: "5 0 * * *"
+
+jobs:
+  checkin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 📦 Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 \
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libcups2 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libgbm1 \
+            libasound2
+
+      - name: 📦 Install Python dependencies
+        run: |
+          pip install -U pip
+          pip install playwright requests pynacl
+          playwright install chromium
+
+      - name: ▶️ Run Leaflow Checkin
+        env:
+          LEAFLOW_ACCOUNTS: ${{ secrets.LEAFLOW_ACCOUNTS }}
+          REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          python Leaflow/Leaflowcheckin.py
+
+      - name: 📸 Upload login fail screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: leaflow-login-fail
+          path: |
+            login_fail_*.png
+            leaflow_login_fail_*.png
