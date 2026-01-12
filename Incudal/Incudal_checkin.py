@@ -722,8 +722,8 @@ class AutoLogin:
             code_data = data
         
         if code_data:
-            self.log(f"🟢获得兑换码： {self.decode_redeem(code_data["codeType"], code_data["codeValue"])}")  # 输出: CPU +50%
-            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(code_data["codeType"], code_data["codeValue"])}")
+            self.log(f"🟢获得兑换码： {self.decode_redeem(code_data['codeType'], code_data['codeValue'])}")  # 输出: CPU +50%
+            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(code_data['codeType'], code_data['codeValue'])}")
         return data
     
     def checkin_and_get_code(self, session):
@@ -744,8 +744,8 @@ class AutoLogin:
             code_data = data
         
         if code_data:
-            self.log(f"🟢获得兑换码： {self.decode_redeem(code_data["codeType"], code_data["codeValue"])}")  # 输出: CPU +50%
-            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(code_data["codeType"], code_data["codeValue"])}")
+            self.log(f"🟢获得兑换码： {self.decode_redeem(code_data['codeType'], code_data['codeValue'])}")  # 输出: CPU +50%
+            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(code_data['codeType'], code_data['codeValue'])}")
         return code_data.get("redeemCode") 
     
     def decode_redeem(self,code_type, code_value):
@@ -781,8 +781,8 @@ class AutoLogin:
             code_data = data
         
         if code_data:
-            self.log(f"🟢获得兑换码： {self.decode_redeem(code_data["codeType"], code_data["codeValue"])}")  # 输出: CPU +50%
-            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(code_data["codeType"], code_data["codeValue"])}")
+            self.log(f"🟢获得兑换码： {self.decode_redeem(code_data['codeType'], code_data['codeValue'])}")  # 输出: CPU +50%
+            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(code_data['codeType'], code_data['codeValue'])}")
         return code_data
 
     def pick_available_proxy(self, timeout=10):
