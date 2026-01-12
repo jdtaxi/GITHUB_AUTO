@@ -958,15 +958,26 @@ class AutoLogin:
                     return
                 
                 # 2. 点击 GitHub
-                self.log("步骤2: 点击 GitHub", "STEP")
-                if not self.click(page, [
-                    'button:has-text("GitHub")',
-                    'a:has-text("GitHub")',
-                    '[data-provider="github"]'
-                ], "GitHub"):
-                    self.log("找不到按钮", "ERROR")
-                    self.notify(False, "找不到 GitHub 按钮")
-                    sys.exit(1)
+                MAX_RETRY = 3  # 最大重试次数
+                RETRY_DELAY = 2  # 每次重试间隔秒数
+                self.log(f"步骤2: 点击 GitHub（最大重试{MAX_RETRY}次，每次重试间隔{RETRY_DELAY}秒）", "STEP")
+                
+                for attempt in range(1, MAX_RETRY + 1):
+                    if self.click(page, [
+                            'button:has-text("GitHub")',
+                            'a:has-text("GitHub")',
+                            '[data-provider="github"]'
+                        ], "GitHub"):
+                        self.log(f"成功点击 GitHub 按钮 (尝试 {attempt})", "INFO")
+                        break  # 点击成功，跳出循环
+                    else:
+                        self.log(f"第 {attempt} 次尝试未找到 GitHub 按钮", "WARNING")
+                        if attempt < MAX_RETRY:
+                            time.sleep(RETRY_DELAY)  # 等待一会儿再试
+                        else:
+                            self.log("找不到 GitHub 按钮，重试次数已用完", "ERROR")
+                            self.notify(False, "找不到 GitHub 按钮")
+                            sys.exit(1)
                 
                 time.sleep(3)
                 page.wait_for_load_state('networkidle', timeout=30000)
