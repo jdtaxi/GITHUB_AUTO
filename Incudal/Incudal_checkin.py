@@ -713,10 +713,10 @@ class AutoLogin:
         self.log(f"↩️ HTTP {resp.status_code}")
         data=self.safe_json(resp)
         # 示例用法
-        if data.get("codeType") or data.get("data", {}).get("codeType"):
-            data=data or data.get("data", {})
-            self.log(f"🟢获得兑换码： {self.decode_redeem(data.codeType, data.codeValue)}")  # 输出: CPU +50%
-            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(data.codeType, data.codeValue)}")
+        if data.get("codeType") or data.get("todayCode", {}).get("codeType"):
+            datatemp=data or data.get("todayCode", {})
+            self.log(f"🟢获得兑换码： {self.decode_redeem(datatemp.codeType, datatemp.codeValue)}")  # 输出: CPU +50%
+            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(datatemp.codeType, datatemp.codeValue)}")
         return data
     
     def checkin_and_get_code(self, session):
