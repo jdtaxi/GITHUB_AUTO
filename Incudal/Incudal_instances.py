@@ -192,7 +192,10 @@ def main():
                 return
 
     logger.error("🚫 所有 package 均创建失败")
-    tg_notify("🚫 <b>Incudal</b>\n所有 package 均创建失败")
+    current_hour = time.localtime().tm_hour
+
+    if current_hour % 6 == 0:
+        tg_notify("🚫 <b>Incudal</b>\n所有 package 均创建失败")
 
 # ==================== 入口 ====================
 
