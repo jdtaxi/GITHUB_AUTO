@@ -713,10 +713,14 @@ class AutoLogin:
         self.log(f"↩️ HTTP {resp.status_code}")
         data=self.safe_json(resp)
         # 示例用法
-        if data.get("codeType") or data.get("todayCode", {}).get("codeType"):
-            datatemp=data or data.get("todayCode", {})
-            self.log(f"🟢获得兑换码： {self.decode_redeem(datatemp.codeType, datatemp.codeValue)}")  # 输出: CPU +50%
-            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(datatemp.codeType, datatemp.codeValue)}")
+        if isinstance(data.get("todayCode"), dict):
+            code_data = data["todayCode"]
+        elif "codeType" in data:
+            code_data = data
+        
+        if code_data:
+            self.log(f"🟢获得兑换码： {self.decode_redeem(code_data.codeType, code_data.codeValue)}")  # 输出: CPU +50%
+            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(code_data.codeType, code_data.codeValue)}")
         return data
     
     def checkin_and_get_code(self, session):
@@ -728,11 +732,15 @@ class AutoLogin:
         self.log(f"↩️ HTTP {resp.status_code}")
         data = self.safe_json(resp)
         # 示例用法
-        if data.get("codeType") or data.get("data", {}).get("codeType"):
-            data=data or data.get("data", {})
-            self.log(f"🟢获得兑换码： {self.decode_redeem(data.codeType, data.codeValue)}")  # 输出: CPU +50%
-            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(data.codeType, data.codeValue)}")
-        return data.get("redeemCode") or data.get("data", {}).get("redeemCode")
+        if isinstance(data.get("todayCode"), dict):
+            code_data = data["todayCode"]
+        elif "codeType" in data:
+            code_data = data
+        
+        if code_data:
+            self.log(f"🟢获得兑换码： {self.decode_redeem(code_data.codeType, code_data.codeValue)}")  # 输出: CPU +50%
+            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(code_data.codeType, code_data.codeValue)}")
+        return code_data.get("redeemCode") 
     
     def decode_redeem(self,code_type, code_value):
         type_map = {
@@ -758,11 +766,15 @@ class AutoLogin:
         self.log(f"↩️ HTTP {resp.status_code}")
         data = self.safe_json(resp)
         # 示例用法
-        if data.get("codeType") or data.get("data", {}).get("codeType"):
-            data=data or data.get("data", {})
-            self.log(f"🟢获得兑换码： {self.decode_redeem(data.codeType, data.codeValue)}")  # 输出: CPU +50%
-            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(data.codeType, data.codeValue)}")
-        return data
+        if isinstance(data.get("todayCode"), dict):
+            code_data = data["todayCode"]
+        elif "codeType" in data:
+            code_data = data
+        
+        if code_data:
+            self.log(f"🟢获得兑换码： {self.decode_redeem(code_data.codeType, code_data.codeValue)}")  # 输出: CPU +50%
+            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(code_data.codeType, code_data.codeValue)}")
+        return code_data
 
     def pick_available_proxy(self, timeout=10):
         """
