@@ -713,9 +713,12 @@ class AutoLogin:
         self.log(f"↩️ HTTP {resp.status_code}")
         data=self.safe_json(resp)
         # 示例用法
+        code_data = None  # 🔹 先初始化
+
+        # 判断 todayCode 是否存在
         if isinstance(data.get("todayCode"), dict):
             code_data = data["todayCode"]
-        elif "codeType" in data:
+        elif isinstance(data, dict) and "codeType" in data:
             code_data = data
         
         if code_data:
@@ -732,9 +735,12 @@ class AutoLogin:
         self.log(f"↩️ HTTP {resp.status_code}")
         data = self.safe_json(resp)
         # 示例用法
+        code_data = None  # 🔹 先初始化
+
+        # 判断 todayCode 是否存在
         if isinstance(data.get("todayCode"), dict):
             code_data = data["todayCode"]
-        elif "codeType" in data:
+        elif isinstance(data, dict) and "codeType" in data:
             code_data = data
         
         if code_data:
@@ -766,9 +772,12 @@ class AutoLogin:
         self.log(f"↩️ HTTP {resp.status_code}")
         data = self.safe_json(resp)
         # 示例用法
+        code_data = None  # 🔹 先初始化
+
+        # 判断 todayCode 是否存在
         if isinstance(data.get("todayCode"), dict):
             code_data = data["todayCode"]
-        elif "codeType" in data:
+        elif isinstance(data, dict) and "codeType" in data:
             code_data = data
         
         if code_data:
