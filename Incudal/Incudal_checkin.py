@@ -722,11 +722,13 @@ class AutoLogin:
         self.log(f"↩️ HTTP {resp.status_code}")
         data = self.safe_json(resp)
         # 示例用法
-        self.log(f"🟢 {decode_redeem(data.codeType, data.codeValue)}")  # 输出: CPU +50%
-        tg_lines.append(f"🟢 {decode_redeem(data.codeType, data.codeValue)}")
+        if data.get("redeemCode") or data.get("data", {}).get("redeemCode"):
+            data=data or data.get("data", {})
+            self.log(f"🟢获得兑换码： {self.decode_redeem(data.codeType, data.codeValue)}")  # 输出: CPU +50%
+            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(data.codeType, data.codeValue)}")
         return data.get("redeemCode") or data.get("data", {}).get("redeemCode")
     
-    def decode_redeem(code_type, code_value):
+    def decode_redeem(self,code_type, code_value):
         type_map = {
             "c": {"name": "CPU", "unit": "%"},
             "r": {"name": "内存", "unit": "MB"},
@@ -748,6 +750,12 @@ class AutoLogin:
             timeout=TIMEOUT
         )
         self.log(f"↩️ HTTP {resp.status_code}")
+        data = self.safe_json(resp)
+        # 示例用法
+        if data.get("redeemCode") or data.get("data", {}).get("redeemCode"):
+            data=data or data.get("data", {})
+            self.log(f"🟢获得兑换码： {self.decode_redeem(data.codeType, data.codeValue)}")  # 输出: CPU +50%
+            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(data.codeType, data.codeValue)}")
         return self.safe_json(resp)
 
     def pick_available_proxy(self, timeout=10):
