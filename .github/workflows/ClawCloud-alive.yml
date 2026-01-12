@@ -2,7 +2,7 @@ name: ClawCloud 自动登录保活
 
 on:
   schedule:
-    - cron: '30 7 */10 * *'  # UTC 7:00，每5天运行
+    - cron: '30 0 */10 * *'  # UTC 7:00，每5天运行
   workflow_dispatch:
 
 jobs:
@@ -36,4 +36,4 @@ jobs:
           PROXY: ${{ secrets.PROXY }}
           GH_2FA_SECRET: ${{ secrets.GH_2FA_SECRET }}
           
-        run: python ClawCloud_alive.py
+        run: python ClawCloud/ClawCloud_alive.py

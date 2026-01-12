@@ -2,7 +2,7 @@ name: Incudal 自动登录签到
 
 on:
   schedule:
-    - cron: '30 7 * * *'  # UTC 7:00，每5天运行
+    - cron: '30 0,12 * * *'  # UTC 7:00，每5天运行
   workflow_dispatch:
 
 jobs:
@@ -36,4 +36,4 @@ jobs:
           PROXY: ${{ secrets.PROXY }}
           GH_2FA_SECRET: ${{ secrets.GH_2FA_SECRET }}
           
-        run: python Incudal_checkin.py
+        run: python Incudal/Incudal_checkin.py
