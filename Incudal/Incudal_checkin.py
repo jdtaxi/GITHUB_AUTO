@@ -18,7 +18,10 @@ import pyotp  # 用于生成 2FA 验证码
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
 # ====================== 基础配置 ======================
-
+tg_lines = [
+    f"📅 日期：{time.strftime('%Y-%m-%d')}",
+    "🖥 GitHub Actions",
+]
 INSTANCE_IDS = {"greenwave1987":[1223, 753],"jdtaxi":[2013]}
 
 TARGET_URL = "https://incudal.com"
@@ -877,10 +880,7 @@ class AutoLogin:
     def run(self):
         start_ts = time.time()
    
-        tg_lines = [
-            f"📅 日期：{time.strftime('%Y-%m-%d')}",
-            "🖥 GitHub Actions",
-        ]
+
         print("\n" + "="*50)
         print("🚀 Incudal 自动登录")
         print("="*50 + "\n")
