@@ -4,10 +4,6 @@ on:
   repository_dispatch:
     types: [tg-command]
 
-concurrency:
-  group: tg-bot
-  cancel-in-progress: false
-
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -15,26 +11,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Show payload
-        run: |
-          echo "CMD=${{ github.event.client_payload.cmd }}"
-          echo "ARGS=${{ toJson(github.event.client_payload.args) }}"
-          echo "FROM=${{ github.event.client_payload.from }}"
-
-      - name: Execute
+      - name: Run command
+        id: exec
         run: |
           CMD="${{ github.event.client_payload.cmd }}"
+          ARG0="${{ github.event.client_payload.args[0] }}"
+
           case "$CMD" in
             status)
-              uptime
+              OUTPUT=$(uptime)
               ;;
             deploy)
-              ./deploy.sh "${{ github.event.client_payload.args[0] }}"
+              OUTPUT=$(./deploy.sh "$ARG0")
               ;;
             restart)
-              echo "restart service"
+              OUTPUT="restart done"
               ;;
             *)
               echo "Unknown command"
               exit 1
           esac
+
+          echo "output<<EOF" >> $GITHUB_OUTPUT
+          echo "$OUTPUT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Send result to Telegram
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          CHAT_ID="${{ github.event.client_payload.chat_id }}"
+          CMD="${{ github.event.client_payload.cmd }}"
+          OUT="${{ steps.exec.outputs.output }}"
+
+          TEXT="*命令:* $CMD\n*状态:* $STATUS\n\`\`\`\n$OUT\n\`\`\`"
+
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":$CHAT_ID,\"text\":\"$TEXT\"}" \
+            https://tg-github-bot.greenwave1987.workers.dev/callback
