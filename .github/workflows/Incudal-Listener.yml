@@ -1,103 +1,136 @@
-import asyncio
-import os
-import base64
-import re
-import subprocess
-import time
-from telethon import TelegramClient, events
+name: Incudal TG Group Listener & Redeem
 
-TG_APIS = os.getenv("TG_APIS")
-GROUP = os.getenv("GROUP")
-TARGET_IDS = os.getenv("TARGET_IDS", "").split(",")
-LISTEN_SECONDS = int(os.getenv("LISTEN_SECONDS", "120"))
-USE_API_ID = os.getenv("USE_API_ID")
-USER_SESSION = os.getenv("USER_SESSION")
+on:
+  workflow_dispatch:
 
-RESULTS = []
+jobs:
+  tg-listen:
+    runs-on: ubuntu-latest
 
-# 获取指定账号信息
-api_id = None
-api_hash = None
-session_b64 = None
-for item in TG_APIS.split(","):
-    id_, hash_ = item.split(":")
-    if id_ == USE_API_ID:
-        api_id = int(id_)
-        api_hash = hash_
-        session_b64 = os.getenv(f"TG{id_}")
-        break
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
 
-if not all([api_id, api_hash, session_b64]):
-    raise SystemExit(f"❌ 未找到指定 TG 账号 {USE_API_ID}")
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-session_file = f"TG{api_id}.session"
-with open(session_file, "wb") as f:
-    f.write(base64.b64decode(session_b64))
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install telethon requests
 
-client = TelegramClient(session_file, api_id, api_hash)
+      - name: Run TG Listener
+        env:
+          # TG 账号信息，格式 api_id:api_hash,api_id:api_hash
+          TG_APIS: ${{ secrets.TG_APIS }}
 
-CODE_REGEX = re.compile(r'\b[crdth]-[\w-]{8,40}\b')
+          # 每个 TG 账号对应的 session base64
+          TG11027029: ${{ secrets.TG11027029 }}
+          TG12965303: ${{ secrets.TG12965303 }}
 
-@client.on(events.NewMessage(chats=GROUP))
-async def handler(event):
-    sender = await event.get_sender()
-    text = event.raw_text
-    sender_id = str(sender.id)
+          # 群聊信息
+          GROUP: "@incudal_com"
 
-    print(f"收到消息 | 用户: {sender.username} | ID: {sender_id} | 内容: {text}", flush=True)
+          # 目标成员 ID
+          TARGET_IDS: "-1003435357437,1966630851"
 
-    if sender_id in TARGET_IDS:
-        codes = CODE_REGEX.findall(text)
-        if codes:
-            codes_text = "\n".join(codes)
-            os.environ["REDEEM_TEXT"] = codes_text
-            print(f"匹配到兑换码: {codes_text}，开始调用 redeem.py", flush=True)
-            try:
-                process = subprocess.Popen(
-                    ["python", "scripts/redeem.py"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True
-                )
-                for line in process.stdout:
-                    print(line, end="", flush=True)
-                process.wait()
-                RESULTS.append(f"用户 {sender.username}({sender_id}) 消息触发：\n{codes_text}")
-            except Exception as e:
-                print(f"执行 redeem.py 失败: {e}", flush=True)
-                RESULTS.append(f"用户 {sender.username}({sender_id}) 执行失败：{e}")
+          # 监听时间（秒）
+          LISTEN_SECONDS: 120
 
-async def send_summary():
-    text = "📊 TG 消息触发兑换结果\n\n" + "\n\n".join(RESULTS) if RESULTS else "📊 没有触发任何兑换"
-    await client.send_message("me", text)
+          # 指定要使用的 TG 账号
+          USE_API_ID: "11027029"
 
-async def main():
-    await client.start()
-    print(f"✅ 已登录 TG 用户 {api_id}，开始监听群聊消息...", flush=True)
+          # Incudal 用户 session
+          USER_SESSION: ${{ secrets.USER_SESSION }}
 
-    start_time = time.time()
-    total_minutes = LISTEN_SECONDS // 60
-    next_minute = 1
+        run: |
+          mkdir -p scripts
 
-    while True:
-        elapsed = time.time() - start_time
-        remaining = LISTEN_SECONDS - elapsed
-        if remaining <= 0:
-            break
+          # 写入 TG Listener 脚本（每分钟打印剩余时间 + 实时输出兑换日志）
+          cat > scripts/listen_group.py << 'EOF'
+          import asyncio
+          import os
+          import base64
+          import re
+          import subprocess
+          import time
+          from telethon import TelegramClient, events
 
-        minutes_left = int(remaining // 60)
-        if minutes_left < total_minutes - next_minute + 1:
-            print(f"⏱ 监听剩余时间: {minutes_left} 分钟", flush=True)
-            next_minute += 1
+          TG_APIS = os.getenv("TG_APIS")
+          GROUP = os.getenv("GROUP")
+          TARGET_IDS = os.getenv("TARGET_IDS", "").split(",")
+          LISTEN_SECONDS = int(os.getenv("LISTEN_SECONDS", "120"))
+          USE_API_ID = os.getenv("USE_API_ID")
+          USER_SESSION = os.getenv("USER_SESSION")
 
-        await asyncio.sleep(1)
+          RESULTS = []
 
-    print("\n⏰ 监听结束，发送汇总...", flush=True)
-    await send_summary()
-    await client.disconnect()
-    print("✅ 监听结束", flush=True)
+          # 获取指定账号信息
+          api_id = None
+          api_hash = None
+          session_b64 = None
+          for item in TG_APIS.split(","):
+              id_, hash_ = item.split(":")
+              if id_ == USE_API_ID:
+                  api_id = int(id_)
+                  api_hash = hash_
+                  session_b64 = os.getenv(f"TG{id_}")
+                  break
 
-if __name__ == "__main__":
-    if not USER_SESSION:
-        raise RuntimeError("❌ USER_SESSION 未设置")
-    asyncio.run(main())
+          if not all([api_id, api_hash, session_b64]):
+              raise SystemExit(f"❌ 未找到指定 TG 账号 {USE_API_ID}")
+
+          session_file = f"TG{api_id}.session"
+          with open(session_file, "wb") as f:
+              f.write(base64.b64decode(session_b64))
+
+          client = TelegramClient(session_file, api_id, api_hash)
+
+          CODE_REGEX = re.compile(r'\b[crdth]-[\w-]{8,40}\b')
+
+          @client.on(events.NewMessage(chats=GROUP))
+          async def handler(event):
+              sender = await event.get_sender()
+              text = event.raw_text
+              sender_id = str(sender.id)
+
+              print(f"收到消息 | 用户: {sender.username} | ID: {sender_id} | 内容: {text}", flush=True)
+
+              if sender_id in TARGET_IDS:
+                  codes = CODE_REGEX.findall(text)
+                  if codes:
+                      codes_text = "\n".join(codes)
+                      os.environ["REDEEM_TEXT"] = codes_text
+                      print(f"匹配到兑换码: {codes_text}，开始调用 redeem.py", flush=True)
+                      try:
+                          process = subprocess.Popen(
+                              ["python", "scripts/redeem.py"],
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT,
+                              text=True
+                          )
+                          for line in process.stdout:
+                              print(line, end="", flush=True)
+                          process.wait()
+                          RESULTS.append(f"用户 {sender.username}({sender_id}) 消息触发：\n{codes_text}")
+                      except Exception as e:
+                          print(f"执行 redeem.py 失败: {e}", flush=True)
+                          RESULTS.append(f"用户 {sender.username}({sender_id}) 执行失败：{e}")
+
+          async def send_summary():
+              text = "📊 TG 消息触发兑换结果\n\n" + "\n\n".join(RESULTS) if RESULTS else "📊 没有触发任何兑换"
+              await client.send_message("me", text)
+
+          async def main():
+              await client.start()
+              print(f"✅ 已登录 TG 用户 {api_id}，开始监听群聊消息...", flush=True)
+
+              start_time = time.time()
+              total_minutes = LISTEN_SECONDS // 60
+              next_minute = 1
+
+              while True:
+                  elapsed = time.time() - start_time
+                  remaining = LISTEN_SECONDS - elapsed
