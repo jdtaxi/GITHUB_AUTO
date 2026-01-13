@@ -1,11 +1,11 @@
-name: Run Python Script And Return Message
+name: Redeem from Telegram
 
 on:
   repository_dispatch:
-    types: [process-text]
+    types: [redeem]
 
 jobs:
-  run:
+  redeem:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,38 +15,24 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Execute python script
-        id: exec
+      - name: Run redeem script
         env:
-          INPUT_TEXT: ${{ github.event.client_payload.text }}
+          USER_SESSION: ${{ secrets.USER_SESSION }}
+          REDEEM_TEXT: ${{ github.event.client_payload.redeem_text }}
         run: |
-          set -e
-
-          python Incudal/process.py
-
-          if [ ! -f result.txt ]; then
-            echo "message=脚本未生成 result.txt" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          MESSAGE=$(cat result.txt)
-
-          echo "message<<EOF" >> $GITHUB_OUTPUT
-          echo "$MESSAGE" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          python scripts/redeem.py
 
       - name: Callback to TG
         if: always()
         run: |
-          CALLBACK_URL="https://tg-github-bot.greenwave1987.workers.dev/callback"
+          CALLBACK="https://你的worker域名/callback"
           CHAT_ID="${{ github.event.client_payload.chat_id }}"
-          TEXT="${{ steps.exec.outputs.message }}"
+          TEXT=$(cat result.txt)
 
-          JSON=$(jq -Rn \
+          jq -Rn \
             --arg chat_id "$CHAT_ID" \
             --arg text "$TEXT" \
-            '{chat_id:$chat_id,text:$text}')
-
-          curl -s -X POST "$CALLBACK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$JSON"
+            '{chat_id:$chat_id,text:$text}' \
+          | curl -s -X POST "$CALLBACK" \
+              -H "Content-Type: application/json" \
+              -d @-
