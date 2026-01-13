@@ -2,7 +2,7 @@ name: Incudal TG 监听
 
 on:
   schedule:
-    - cron: '30 18 * * *'  # UTC 7:00，每5天运行
+    - cron: '30 10 * * *'  # UTC 7:00，每5天运行
   workflow_dispatch:
 
 jobs:
