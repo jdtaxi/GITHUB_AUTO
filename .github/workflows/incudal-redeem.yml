@@ -1,4 +1,4 @@
-name: Redeem from Telegram
+name: TG BOT Redeem（机器人发码兑换）
 
 on:
   repository_dispatch:
