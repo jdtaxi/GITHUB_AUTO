@@ -20,6 +20,7 @@ jobs:
           USER_SESSION: ${{ secrets.USER_SESSION }}
           REDEEM_TEXT: ${{ github.event.client_payload.redeem_text }}
         run: |
+          pip install requests
           python Incudal/redeem.py
 
       - name: Send result back to TG
