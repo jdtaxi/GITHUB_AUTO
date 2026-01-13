@@ -5,15 +5,27 @@ import requests
 BASE_URL = "https://incudal.com"
 TIMEOUT = 15
 
+# result.txt 文件路径
+RESULT_FILE = os.path.join(os.getcwd(), "result.txt")
+
+# 每次写入一行，保证日志实时写入文件
+def append_line(line):
+    with open(RESULT_FILE, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+    print(line, flush=True)  # flush=True 保证 Actions 实时打印
+
 def build_session():
-    data = json.loads(os.environ["USER_SESSION"])
+    raw = os.environ.get("USER_SESSION")
+    if not raw:
+        raise RuntimeError("❌ USER_SESSION 未设置")
+    data = json.loads(raw)
     s = requests.Session()
     s.headers.update({
         "authorization": data["auth_token"],
         "user-agent": "Mozilla/5.0",
         "accept": "application/json"
     })
-    for c in data["cookies"]:
+    for c in data.get("cookies", []):
         s.cookies.set(c["name"], c["value"], domain=c.get("domain"))
     return s
 
@@ -32,44 +44,62 @@ def decode(code_type, value):
     }.get(code_type, code_type) + f" +{value}"
 
 def get_instances(session):
-    r = session.get(f"{BASE_URL}/api/instances", timeout=TIMEOUT)
-    r.raise_for_status()
-    return r.json().get("instances", [])
+    try:
+        r = session.get(f"{BASE_URL}/api/instances", timeout=TIMEOUT)
+        r.raise_for_status()
+        return r.json().get("instances", [])
+    except Exception as e:
+        append_line(f"❌ 获取实例失败: {e}")
+        return []
 
 def redeem(session, code, instance_id):
-    print(f"🚀 开始兑换实例 {instance_id}，兑换码 {code}")
-    r = session.post(
-        f"{BASE_URL}/api/checkin/redeem",
-        json={"redeemCode": code, "instanceId": instance_id},
-        timeout=TIMEOUT
-    )
-    data = safe_json(r)
-    code_data = data.get("todayCode") if isinstance(data.get("todayCode"), dict) else data
+    try:
+        append_line(f"🚀 开始兑换实例 {instance_id}，兑换码 {code}")
+        r = session.post(
+            f"{BASE_URL}/api/checkin/redeem",
+            json={"redeemCode": code, "instanceId": instance_id},
+            timeout=TIMEOUT
+        )
+        data = safe_json(r)
+        code_data = data.get("todayCode") if isinstance(data.get("todayCode"), dict) else data
 
-    if r.status_code == 200 and code_data and "codeType" in code_data:
-        result = f"✅ {instance_id}: {decode(code_data['codeType'], code_data['codeValue'])}"
-        print(result)
+        if r.status_code == 200 and code_data and "codeType" in code_data:
+            result = f"✅ {instance_id}: {decode(code_data['codeType'], code_data['codeValue'])}"
+            append_line(result)
+            return result
+        result = f"❌ {instance_id}: 失败"
+        append_line(result)
         return result
-    result = f"❌ {instance_id}: 失败"
-    print(result)
-    return result
+    except Exception as e:
+        result = f"❌ {instance_id}: 异常 {e}"
+        append_line(result)
+        return result
 
 def main():
-    session = build_session()
-    codes = [x.strip() for x in os.environ["REDEEM_TEXT"].splitlines() if x.strip()]
-    instances = get_instances(session)
+    # 先清空 result.txt，保证每次运行都是干净文件
+    open(RESULT_FILE, "w", encoding="utf-8").close()
 
-    lines = []
-    for code in codes:
-        print(f"🎟 兑换码 {code} 开始")
-        lines.append(f"🎟 兑换码 {code}")
-        for ins in instances:
-            line = redeem(session, code, ins["id"])
-            lines.append("  " + line)
+    try:
+        session = build_session()
+        codes = [x.strip() for x in os.environ.get("REDEEM_TEXT", "").splitlines() if x.strip()]
+        if not codes:
+            append_line("❌ 没有兑换码，退出")
+            return
 
-    # 确保 result.txt 在当前工作目录
-    result_file = os.path.join(os.getcwd(), "result.txt")
-    with open(result_file, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
+        instances = get_instances(session)
+        if not instances:
+            append_line("❌ 没有实例可兑换")
+            return
 
-    print("✅ 全部兑换完成")
+        for code in codes:
+            append_line(f"🎟 兑换码 {code} 开始")
+            for ins in instances:
+                redeem(session, code, ins["id"])
+
+    except Exception as e:
+        append_line(f"❌ 脚本异常: {e}")
+
+    append_line("✅ 全部兑换完成")
+
+if __name__ == "__main__":
+    main()
