@@ -55,3 +55,49 @@ async def handler(event):
             try:
                 process = subprocess.Popen(
                     ["python", "scripts/redeem.py"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True
+                )
+                for line in process.stdout:
+                    print(line, end="", flush=True)
+                process.wait()
+                RESULTS.append(f"用户 {sender.username}({sender_id}) 消息触发：\n{codes_text}")
+            except Exception as e:
+                print(f"执行 redeem.py 失败: {e}", flush=True)
+                RESULTS.append(f"用户 {sender.username}({sender_id}) 执行失败：{e}")
+
+async def send_summary():
+    text = "📊 TG 消息触发兑换结果\n\n" + "\n\n".join(RESULTS) if RESULTS else "📊 没有触发任何兑换"
+    await client.send_message("me", text)
+
+async def main():
+    await client.start()
+    print(f"✅ 已登录 TG 用户 {api_id}，开始监听群聊消息...", flush=True)
+
+    start_time = time.time()
+    total_minutes = LISTEN_SECONDS // 60
+    next_minute = 1
+
+    while True:
+        elapsed = time.time() - start_time
+        remaining = LISTEN_SECONDS - elapsed
+        if remaining <= 0:
+            break
+
+        minutes_left = int(remaining // 60)
+        if minutes_left < total_minutes - next_minute + 1:
+            print(f"⏱ 监听剩余时间: {minutes_left} 分钟", flush=True)
+            next_minute += 1
+
+        await asyncio.sleep(1)
+
+    print("\n⏰ 监听结束，发送汇总...", flush=True)
+    await send_summary()
+    await client.disconnect()
+    print("✅ 监听结束", flush=True)
+
+if __name__ == "__main__":
+    if not USER_SESSION:
+        raise RuntimeError("❌ USER_SESSION 未设置")
+    asyncio.run(main())
