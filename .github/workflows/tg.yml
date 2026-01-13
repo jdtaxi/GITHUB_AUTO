@@ -20,12 +20,12 @@ jobs:
           USER_SESSION: ${{ secrets.USER_SESSION }}
           REDEEM_TEXT: ${{ github.event.client_payload.redeem_text }}
         run: |
-          python scripts/redeem.py
+          python Incudal/redeem.py
 
       - name: Callback to TG
         if: always()
         run: |
-          CALLBACK="https://你的worker域名/callback"
+          CALLBACK="https://tg-github-bot.greenwave1987.workers.dev/callback"
           CHAT_ID="${{ github.event.client_payload.chat_id }}"
           TEXT=$(cat result.txt)
 
