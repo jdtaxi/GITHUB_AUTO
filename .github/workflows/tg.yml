@@ -10,7 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1️⃣ 执行命令
       - name: Run command
         id: exec
         run: |
@@ -26,7 +25,7 @@ jobs:
               OUTPUT=$(uptime)
               ;;
             deploy)
-              OUTPUT=$(./deploy.sh "${{ github.event.client_payload.args[0] }}")
+              OUTPUT="模拟部署: $ARGS"
               ;;
             restart)
               OUTPUT="服务已重启"
@@ -40,7 +39,6 @@ jobs:
           echo "$OUTPUT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      # 2️⃣ 回传 TG
       - name: Send result to Telegram
         if: always()
         run: |
@@ -48,11 +46,8 @@ jobs:
           CMD="${{ github.event.client_payload.cmd }}"
           OUT="${{ steps.exec.outputs.output }}"
           STATUS="${{ job.status }}"
-
-          # Worker 回调 URL
           CALLBACK_URL="https://<你的-worker域名>/callback"
 
-          # 拼接消息
           TEXT="*命令:* $CMD\n*状态:* $STATUS\n\`\`\`\n$OUT\n\`\`\`"
 
           curl -X POST "$CALLBACK_URL" \
