@@ -1,49 +1,52 @@
-name: Process Text from TG
+name: Run Python Script And Return Message
 
 on:
   repository_dispatch:
     types: [process-text]
 
 jobs:
-  process:
+  run:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Process message
-        id: process
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Execute python script
+        id: exec
+        env:
+          INPUT_TEXT: ${{ github.event.client_payload.text }}
         run: |
-          set +e
-          INPUT="${{ github.event.client_payload.text }}"
-          CHAT_ID="${{ github.event.client_payload.chat_id }}"
+          set -e
 
-          echo "收到原始内容: $INPUT"
+          python scripts/process.py
 
-          # 按行转换数组
-          mapfile -t lines <<< "$INPUT"
+          if [ ! -f result.txt ]; then
+            echo "message=脚本未生成 result.txt" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
-          OUTPUT="处理结果:\n"
-          for i in "${!lines[@]}"; do
-            OUTPUT+="$((i+1)): ${lines[i]}\n"
-          done
+          MESSAGE=$(cat result.txt)
 
-          # 输出 workflow 输出变量
-          echo "output<<EOF" >> $GITHUB_OUTPUT
-          echo -e "$OUTPUT" >> $GITHUB_OUTPUT
+          echo "message<<EOF" >> $GITHUB_OUTPUT
+          echo "$MESSAGE" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Send result back to TG (safe)
+      - name: Callback to TG
         if: always()
         run: |
           CALLBACK_URL="https://tg-github-bot.greenwave1987.workers.dev/callback"
           CHAT_ID="${{ github.event.client_payload.chat_id }}"
-          OUT="${{ steps.process.outputs.output || '处理失败' }}"
+          TEXT="${{ steps.exec.outputs.message }}"
 
-          # 使用 jq 安全生成 JSON，支持中文/英文/特殊字符/多行
-          JSON=$(echo "$OUT" | jq -R --slurp --arg chat_id "$CHAT_ID" '{chat_id:$chat_id, text:.}')
+          JSON=$(jq -Rn \
+            --arg chat_id "$CHAT_ID" \
+            --arg text "$TEXT" \
+            '{chat_id:$chat_id,text:$text}')
 
-          # 重试 3 次，避免临时网络失败
-          for i in {1..3}; do
-            curl -X POST "$CALLBACK_URL" -H "Content-Type: application/json" -d "$JSON" && break
-            sleep 2
-          done
+          curl -s -X POST "$CALLBACK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$JSON"
