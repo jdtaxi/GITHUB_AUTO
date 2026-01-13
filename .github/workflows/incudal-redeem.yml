@@ -25,7 +25,7 @@ jobs:
           USER_SESSION: ${{ secrets.USER_SESSION }}
           REDEEM_TEXT: ${{ github.event.client_payload.redeem_text }}
         run: |
-          python scripts/redeem.py
+          python Incudal/redeem.py
 
       - name: Send result back to TG
         if: always()
