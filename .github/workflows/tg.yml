@@ -7,46 +7,54 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
+      # 1️⃣ 执行命令
       - name: Run command
         id: exec
         run: |
           CMD="${{ github.event.client_payload.cmd }}"
-          ARG0="${{ github.event.client_payload.args[0] }}"
+          ARGS="${{ toJson(github.event.client_payload.args) }}"
+          OUTPUT=""
 
           case "$CMD" in
+            test)
+              OUTPUT="✅ repository_dispatch 测试命令触发成功！"
+              ;;
             status)
               OUTPUT=$(uptime)
               ;;
             deploy)
-              OUTPUT=$(./deploy.sh "$ARG0")
+              OUTPUT=$(./deploy.sh "${{ github.event.client_payload.args[0] }}")
               ;;
             restart)
-              OUTPUT="restart done"
+              OUTPUT="服务已重启"
               ;;
             *)
-              echo "Unknown command"
-              exit 1
+              OUTPUT="未知命令: $CMD"
+              ;;
           esac
 
           echo "output<<EOF" >> $GITHUB_OUTPUT
           echo "$OUTPUT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      # 2️⃣ 回传 TG
       - name: Send result to Telegram
         if: always()
         run: |
-          STATUS="${{ job.status }}"
           CHAT_ID="${{ github.event.client_payload.chat_id }}"
           CMD="${{ github.event.client_payload.cmd }}"
           OUT="${{ steps.exec.outputs.output }}"
+          STATUS="${{ job.status }}"
 
+          # Worker 回调 URL
+          CALLBACK_URL="https://<你的-worker域名>/callback"
+
+          # 拼接消息
           TEXT="*命令:* $CMD\n*状态:* $STATUS\n\`\`\`\n$OUT\n\`\`\`"
 
-          curl -X POST \
+          curl -X POST "$CALLBACK_URL" \
             -H "Content-Type: application/json" \
-            -d "{\"chat_id\":$CHAT_ID,\"text\":\"$TEXT\"}" \
-            https://tg-github-bot.greenwave1987.workers.dev/callback
+            -d "{\"chat_id\":$CHAT_ID,\"text\":\"$TEXT\"}"
