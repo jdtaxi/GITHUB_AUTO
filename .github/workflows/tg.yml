@@ -13,13 +13,13 @@ jobs:
       - name: Process message
         id: process
         run: |
-          set +e  # 避免 step 因非零退出码失败
+          set +e
           INPUT="${{ github.event.client_payload.text }}"
           CHAT_ID="${{ github.event.client_payload.chat_id }}"
 
           echo "收到原始内容: $INPUT"
 
-          # 安全按行转换成数组
+          # 按行转换数组
           mapfile -t lines <<< "$INPUT"
 
           OUTPUT="处理结果:\n"
@@ -27,7 +27,7 @@ jobs:
             OUTPUT+="$((i+1)): ${lines[i]}\n"
           done
 
-          # 保存输出到 workflow 输出变量
+          # 输出 workflow 输出变量
           echo "output<<EOF" >> $GITHUB_OUTPUT
           echo -e "$OUTPUT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -39,10 +39,10 @@ jobs:
           CHAT_ID="${{ github.event.client_payload.chat_id }}"
           OUT="${{ steps.process.outputs.output || '处理失败' }}"
 
-          # 使用 jq 构造安全 JSON，避免换行和特殊字符破坏
-          JSON=$(jq -n --arg chat_id "$CHAT_ID" --arg text "$OUT" '{chat_id:$chat_id, text:$text}')
+          # 使用 jq 安全生成 JSON，支持中文/英文/特殊字符/多行
+          JSON=$(echo "$OUT" | jq -R --slurp --arg chat_id "$CHAT_ID" '{chat_id:$chat_id, text:.}')
 
-          # 重试机制，防止偶尔网络抖动
+          # 重试 3 次，避免临时网络失败
           for i in {1..3}; do
             curl -X POST "$CALLBACK_URL" -H "Content-Type: application/json" -d "$JSON" && break
             sleep 2
