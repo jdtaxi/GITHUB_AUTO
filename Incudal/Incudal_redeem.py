@@ -51,7 +51,7 @@ def get_instances(session):
 
 def redeem(session, code, instance_id):
     try:
-        append_line(f"🚀 开始兑换实例 {instance_id}，兑换码 {code}")
+        append_line(f"🚀 开始兑换实例 {instance_id}：")
         r = session.post(
             f"{BASE_URL}/api/checkin/redeem",
             json={"redeemCode": code, "instanceId": instance_id},
