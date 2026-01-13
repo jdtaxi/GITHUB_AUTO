@@ -1,7 +1,10 @@
 name: Incudal TG Group Listener & Redeem
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # 手动触发
+  push:
+    branches:
+      - main          # 或你想监听的分支
 
 jobs:
   tg-listen:
@@ -23,32 +26,18 @@ jobs:
 
       - name: Run TG Listener
         env:
-          # TG 账号信息，格式 api_id:api_hash,api_id:api_hash
           TG_APIS: ${{ secrets.TG_APIS }}
-
-          # 每个 TG 账号对应的 session base64
           TG11027029: ${{ secrets.TG11027029 }}
           TG12965303: ${{ secrets.TG12965303 }}
-
-          # 群聊信息
           GROUP: "@incudal_com"
-
-          # 目标成员 ID
           TARGET_IDS: "-1003435357437,1966630851"
-
-          # 监听时间（秒）
           LISTEN_SECONDS: 120
-
-          # 指定要使用的 TG 账号
           USE_API_ID: "11027029"
-
-          # Incudal 用户 session
           USER_SESSION: ${{ secrets.USER_SESSION }}
-
         run: |
           mkdir -p scripts
 
-          # 写入 TG Listener 脚本
+          # 写入 listen_group.py
           cat > scripts/listen_group.py << 'EOF'
 import asyncio
 import os
@@ -67,7 +56,6 @@ USER_SESSION = os.getenv("USER_SESSION")
 
 RESULTS = []
 
-# 获取指定账号信息
 api_id = None
 api_hash = None
 session_b64 = None
@@ -87,7 +75,6 @@ with open(session_file, "wb") as f:
     f.write(base64.b64decode(session_b64))
 
 client = TelegramClient(session_file, api_id, api_hash)
-
 CODE_REGEX = re.compile(r'\b[crdth]-[\w-]{8,40}\b')
 
 @client.on(events.NewMessage(chats=GROUP))
@@ -95,7 +82,6 @@ async def handler(event):
     sender = await event.get_sender()
     text = event.raw_text
     sender_id = str(sender.id)
-
     print(f"收到消息 | 用户: {sender.username} | ID: {sender_id} | 内容: {text}", flush=True)
 
     if sender_id in TARGET_IDS:
@@ -114,13 +100,11 @@ async def handler(event):
                 for line in process.stdout:
                     print(line, end="", flush=True)
                 process.wait()
-                RESULTS.append(f"用户 {sender.username}({sender_id}) 消息触发：\n{codes_text}")
             except Exception as e:
                 print(f"执行 redeem.py 失败: {e}", flush=True)
-                RESULTS.append(f"用户 {sender.username}({sender_id}) 执行失败：{e}")
 
 async def send_summary():
-    text = "📊 TG 消息触发兑换结果\n\n" + "\n\n".join(RESULTS) if RESULTS else "📊 没有触发任何兑换"
+    text = "📊 TG 消息触发兑换结果\n\n没有触发任何兑换"
     await client.send_message("me", text)
 
 async def main():
@@ -136,15 +120,13 @@ async def main():
         remaining = LISTEN_SECONDS - elapsed
         if remaining <= 0:
             break
-
         minutes_left = int(remaining // 60)
         if minutes_left < total_minutes - next_minute + 1:
             print(f"⏱ 监听剩余时间: {minutes_left} 分钟", flush=True)
             next_minute += 1
-
         await asyncio.sleep(1)
 
-    print("\n⏰ 监听结束，发送汇总...", flush=True)
+    print("\n⏰ 监听结束", flush=True)
     await send_summary()
     await client.disconnect()
     print("✅ 监听结束", flush=True)
@@ -155,9 +137,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 EOF
 
-          # 写入 redeem.py 脚本
+          # 写入 redeem.py
           cat > scripts/redeem.py << 'EOF'
-import os 
+import os
 import json
 import requests
 
@@ -218,7 +200,6 @@ def redeem(session, code, instance_id):
         )
         data = safe_json(r)
         code_data = data.get("todayCode") if isinstance(data.get("todayCode"), dict) else data
-
         if r.status_code == 200 and code_data and "codeType" in code_data:
             result = f"✅ {instance_id}: {decode(code_data['codeType'], code_data['codeValue'])}"
             append_line(result)
@@ -233,27 +214,22 @@ def redeem(session, code, instance_id):
 
 def main():
     open(RESULT_FILE, "w", encoding="utf-8").close()
-
     try:
         session = build_session()
         codes = [x.strip() for x in os.environ.get("REDEEM_TEXT", "").splitlines() if x.strip()]
         if not codes:
             append_line("❌ 未获取到兑换码，退出")
             return
-
         instances = get_instances(session)
         if not instances:
             append_line("❌ 没有实例可兑换")
             return
-
         for code in codes:
             append_line(f"🎟 兑换码 {code} 开始")
             for ins in instances:
                 redeem(session, code, ins["id"])
-
     except Exception as e:
         append_line(f"❌ 脚本异常: {e}")
-
     append_line("✅ 全部兑换完成")
 
 if __name__ == "__main__":
