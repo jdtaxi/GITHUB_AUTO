@@ -118,6 +118,11 @@ jobs:
                       except Exception as e:
                           print(f"执行 redeem.py 失败: {e}", flush=True)
                           RESULTS.append(f"用户 {sender.username}({sender_id}) 执行失败：{e}")
+                  else:
+                    print(f"未获取到codes！", flush=True)
+              else:
+                print(f"{sender_id}非目标用户！", flush=True)
+                          
 
           async def send_summary():
               text = "📊 TG 消息触发兑换结果\n\n" + "\n\n".join(RESULTS) if RESULTS else "📊 没有触发任何兑换"
