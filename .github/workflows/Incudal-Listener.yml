@@ -1,6 +1,8 @@
 name: Incudal TG 监听
 
 on:
+  schedule:
+    - cron: '30 18 * * *'  # UTC 7:00，每5天运行
   workflow_dispatch:
 
 jobs:
@@ -37,7 +39,7 @@ jobs:
           TARGET_IDS: "-1003435357437,1966630851"
 
           # 监听时间（秒）
-          LISTEN_SECONDS: 120
+          LISTEN_SECONDS: 21600
 
           # 指定要使用的 TG 账号
           USE_API_ID: "11027029"
@@ -60,7 +62,7 @@ jobs:
           TG_APIS = os.getenv("TG_APIS")
           GROUP = os.getenv("GROUP")
           TARGET_IDS = os.getenv("TARGET_IDS", "").split(",")
-          LISTEN_SECONDS = int(os.getenv("LISTEN_SECONDS", "120"))
+          LISTEN_SECONDS = int(os.getenv("LISTEN_SECONDS", "21600"))
           USE_API_ID = os.getenv("USE_API_ID")
           USER_SESSION = os.getenv("USER_SESSION")
 
