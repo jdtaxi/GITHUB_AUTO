@@ -1,4 +1,4 @@
-name: Incudal TG Group Listener & Redeem
+name: TG Group Listener & Redeem
 
 on:
   workflow_dispatch:
@@ -30,17 +30,11 @@ jobs:
           TG11027029: ${{ secrets.TG11027029 }}
           TG12965303: ${{ secrets.TG12965303 }}
 
-          # 可选代理（不使用可留空）
-          PROXIES: ${{ secrets.PROXIES }}
-
           # 群聊信息
           GROUP: "@incudal_com"
 
           # 目标成员 ID
           TARGET_IDS: "-1003435357437,1966630851"
-
-          # 匹配到消息后执行命令
-          COMMAND: "python scripts/redeem.py"
 
           # 监听时间（秒）
           LISTEN_SECONDS: 60
@@ -48,22 +42,26 @@ jobs:
           # 指定要使用的 TG 账号
           USE_API_ID: "11027029"
 
+          # Incudal 用户 session
+          USER_SESSION: ${{ secrets.USER_SESSION }}
+
         run: |
           mkdir -p scripts
+          # 写入 TG Listener 脚本
           cat > scripts/listen_group.py << 'EOF'
           import asyncio
           import os
           import base64
-          import subprocess
           import re
+          import subprocess
           from telethon import TelegramClient, events
 
           TG_APIS = os.getenv("TG_APIS")
           GROUP = os.getenv("GROUP")
           TARGET_IDS = os.getenv("TARGET_IDS", "").split(",")
-          COMMAND = os.getenv("COMMAND")
           LISTEN_SECONDS = int(os.getenv("LISTEN_SECONDS", "60"))
           USE_API_ID = os.getenv("USE_API_ID")
+          USER_SESSION = os.getenv("USER_SESSION")
 
           RESULTS = []
 
@@ -102,15 +100,16 @@ jobs:
               if sender_id in TARGET_IDS:
                   codes = CODE_REGEX.findall(text)
                   if codes:
-                      for code in codes:
-                          print(f"匹配到兑换码: {code}，开始执行兑换脚本")
-                          try:
-                              result = subprocess.run(f"{COMMAND} {code}", shell=True, capture_output=True, text=True)
-                              print(f"兑换输出:\n{result.stdout}\n{result.stderr}")
-                              RESULTS.append(f"用户 {sender.username}({sender_id}) 消息触发，兑换码 {code}：\n{result.stdout}")
-                          except Exception as e:
-                              print(f"执行兑换脚本失败: {e}")
-                              RESULTS.append(f"用户 {sender.username}({sender_id}) 兑换码 {code} 执行失败：{e}")
+                      codes_text = "\n".join(codes)
+                      os.environ["REDEEM_TEXT"] = codes_text
+                      print(f"匹配到兑换码: {codes_text}，开始调用 redeem.py")
+                      try:
+                          result = subprocess.run("python scripts/redeem.py", shell=True, capture_output=True, text=True)
+                          print(f"兑换输出:\n{result.stdout}\n{result.stderr}")
+                          RESULTS.append(f"用户 {sender.username}({sender_id}) 消息触发：\n{result.stdout}")
+                      except Exception as e:
+                          print(f"执行 redeem.py 失败: {e}")
+                          RESULTS.append(f"用户 {sender.username}({sender_id}) 执行失败：{e}")
 
           async def send_summary():
               text = "📊 TG 消息触发兑换结果\n\n" + "\n\n".join(RESULTS) if RESULTS else "📊 没有触发任何兑换"
@@ -125,7 +124,115 @@ jobs:
               print("监听结束")
 
           if __name__ == "__main__":
+              if not USER_SESSION:
+                  raise RuntimeError("❌ USER_SESSION 未设置")
               asyncio.run(main())
           EOF
 
+          # 写入 redeem.py 脚本
+          cat > scripts/redeem.py << 'EOF'
+          import os 
+          import json
+          import requests
+
+          BASE_URL = "https://incudal.com"
+          TIMEOUT = 15
+          RESULT_FILE = os.path.join(os.getcwd(), "result.txt")
+
+          def append_line(line):
+              with open(RESULT_FILE, "a", encoding="utf-8") as f:
+                  f.write(line + "\n")
+              print(line, flush=True)
+
+          def build_session():
+              raw = os.environ.get("USER_SESSION")
+              if not raw:
+                  raise RuntimeError("❌ USER_SESSION 未设置")
+              data = json.loads(raw)
+              s = requests.Session()
+              s.headers.update({
+                  "authorization": data["auth_token"],
+                  "user-agent": "Mozilla/5.0",
+                  "accept": "application/json"
+              })
+              for c in data.get("cookies", []):
+                  s.cookies.set(c["name"], c["value"], domain=c.get("domain"))
+              return s
+
+          def safe_json(r):
+              try:
+                  return r.json()
+              except:
+                  return {}
+
+          def decode(code_type, value):
+              return {
+                  "cpu": "CPU",
+                  "memory": "内存",
+                  "disk": "硬盘",
+                  "traffic": "流量"
+              }.get(code_type, code_type) + f" +{value}"
+
+          def get_instances(session):
+              try:
+                  r = session.get(f"{BASE_URL}/api/instances", timeout=TIMEOUT)
+                  r.raise_for_status()
+                  return r.json().get("instances", [])
+              except Exception as e:
+                  append_line(f"❌ 获取实例失败: {e}")
+                  return []
+
+          def redeem(session, code, instance_id):
+              try:
+                  append_line(f"🚀 开始兑换实例 {instance_id}：")
+                  r = session.post(
+                      f"{BASE_URL}/api/checkin/redeem",
+                      json={"redeemCode": code, "instanceId": instance_id},
+                      timeout=TIMEOUT
+                  )
+                  data = safe_json(r)
+                  code_data = data.get("todayCode") if isinstance(data.get("todayCode"), dict) else data
+
+                  if r.status_code == 200 and code_data and "codeType" in code_data:
+                      result = f"✅ {instance_id}: {decode(code_data['codeType'], code_data['codeValue'])}"
+                      append_line(result)
+                      return result
+                  result = f"❌ {instance_id}: {data.get('error','未知错误')}"
+                  append_line(result)
+                  return result
+              except Exception as e:
+                  result = f"❌ {instance_id}: 异常 {e}"
+                  append_line(result)
+                  return result
+
+          def main():
+              open(RESULT_FILE, "w", encoding="utf-8").close()
+
+              try:
+                  session = build_session()
+                  codes = [x.strip() for x in os.environ.get("REDEEM_TEXT", "").splitlines() if x.strip()]
+                  if not codes:
+                      append_line("❌ 未获取到兑换码，退出")
+                      return
+
+                  instances = get_instances(session)
+                  if not instances:
+                      append_line("❌ 没有实例可兑换")
+                      return
+
+                  for code in codes:
+                      append_line(f"🎟 兑换码 {code} 开始")
+                      for ins in instances:
+                          redeem(session, code, ins["id"])
+
+              except Exception as e:
+                  append_line(f"❌ 脚本异常: {e}")
+
+              append_line("✅ 全部兑换完成")
+
+          if __name__ == "__main__":
+              main()
+          EOF
+
+          # 执行 TG Listener
           python scripts/listen_group.py
