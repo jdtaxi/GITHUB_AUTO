@@ -61,6 +61,7 @@ def redeem(session, code, instance_id):
             timeout=TIMEOUT
         )
         data = safe_json(r)
+        print(data)
         code_data = data.get("todayCode") if isinstance(data.get("todayCode"), dict) else data
 
         if r.status_code == 200 and code_data and "codeType" in code_data:
