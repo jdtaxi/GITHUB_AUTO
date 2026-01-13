@@ -37,7 +37,7 @@ jobs:
           TARGET_IDS: "-1003435357437,1966630851"
 
           # 监听时间（秒）
-          LISTEN_SECONDS: 60
+          LISTEN_SECONDS: 120
 
           # 指定要使用的 TG 账号
           USE_API_ID: "11027029"
@@ -47,13 +47,14 @@ jobs:
 
         run: |
           mkdir -p scripts
-          # 写入 TG Listener 脚本
+          # 写入 TG Listener 脚本（实时打印 + 剩余时间）
           cat > scripts/listen_group.py << 'EOF'
           import asyncio
           import os
           import base64
           import re
           import subprocess
+          import time
           from telethon import TelegramClient, events
 
           TG_APIS = os.getenv("TG_APIS")
@@ -65,7 +66,6 @@ jobs:
 
           RESULTS = []
 
-          # 获取指定账号信息
           api_id = None
           api_hash = None
           session_b64 = None
@@ -86,7 +86,6 @@ jobs:
 
           client = TelegramClient(session_file, api_id, api_hash)
 
-          # 正则匹配兑换码
           CODE_REGEX = re.compile(r'\b[crdth]-[\w-]{8,40}\b')
 
           @client.on(events.NewMessage(chats=GROUP))
@@ -95,20 +94,27 @@ jobs:
               text = event.raw_text
               sender_id = str(sender.id)
 
-              print(f"收到消息 | 用户: {sender.username} | ID: {sender_id} | 内容: {text}")
+              print(f"收到消息 | 用户: {sender.username} | ID: {sender_id} | 内容: {text}", flush=True)
 
               if sender_id in TARGET_IDS:
                   codes = CODE_REGEX.findall(text)
                   if codes:
                       codes_text = "\n".join(codes)
                       os.environ["REDEEM_TEXT"] = codes_text
-                      print(f"匹配到兑换码: {codes_text}，开始调用 redeem.py")
+                      print(f"匹配到兑换码: {codes_text}，开始调用 redeem.py", flush=True)
                       try:
-                          result = subprocess.run("python scripts/redeem.py", shell=True, capture_output=True, text=True)
-                          print(f"兑换输出:\n{result.stdout}\n{result.stderr}")
-                          RESULTS.append(f"用户 {sender.username}({sender_id}) 消息触发：\n{result.stdout}")
+                          process = subprocess.Popen(
+                              ["python", "scripts/redeem.py"],
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT,
+                              text=True
+                          )
+                          for line in process.stdout:
+                              print(line, end="", flush=True)
+                          process.wait()
+                          RESULTS.append(f"用户 {sender.username}({sender_id}) 消息触发：\n{codes_text}")
                       except Exception as e:
-                          print(f"执行 redeem.py 失败: {e}")
+                          print(f"执行 redeem.py 失败: {e}", flush=True)
                           RESULTS.append(f"用户 {sender.username}({sender_id}) 执行失败：{e}")
 
           async def send_summary():
@@ -117,11 +123,21 @@ jobs:
 
           async def main():
               await client.start()
-              print(f"✅ 已登录 TG 用户 {api_id}，开始监听群聊消息...")
-              await asyncio.sleep(LISTEN_SECONDS)
+              print(f"✅ 已登录 TG 用户 {api_id}，开始监听群聊消息...", flush=True)
+
+              start_time = time.time()
+              while True:
+                  elapsed = time.time() - start_time
+                  remaining = LISTEN_SECONDS - elapsed
+                  if remaining <= 0:
+                      break
+                  print(f"⏱ 监听剩余时间: {int(remaining)} 秒", end="\r", flush=True)
+                  await asyncio.sleep(1)
+
+              print("\n⏰ 监听结束，发送汇总...", flush=True)
               await send_summary()
               await client.disconnect()
-              print("监听结束")
+              print("✅ 监听结束", flush=True)
 
           if __name__ == "__main__":
               if not USER_SESSION:
@@ -129,7 +145,7 @@ jobs:
               asyncio.run(main())
           EOF
 
-          # 写入 redeem.py 脚本
+          # 写入 redeem.py 脚本（保持原样）
           cat > scripts/redeem.py << 'EOF'
           import os 
           import json
