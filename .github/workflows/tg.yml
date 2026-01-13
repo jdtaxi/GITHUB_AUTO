@@ -22,7 +22,7 @@ jobs:
         run: |
           python Incudal/redeem.py
 
-      - name: Callback to TG
+      - name: Send result back to TG
         if: always()
         run: |
           CALLBACK="https://tg-github-bot.greenwave1987.workers.dev/callback"
