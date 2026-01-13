@@ -4,15 +4,12 @@ import requests
 
 BASE_URL = "https://incudal.com"
 TIMEOUT = 15
-
-# result.txt 文件路径
 RESULT_FILE = os.path.join(os.getcwd(), "result.txt")
 
-# 每次写入一行，保证日志实时写入文件
 def append_line(line):
     with open(RESULT_FILE, "a", encoding="utf-8") as f:
         f.write(line + "\n")
-    print(line, flush=True)  # flush=True 保证 Actions 实时打印
+    print(line, flush=True)
 
 def build_session():
     raw = os.environ.get("USER_SESSION")
@@ -35,19 +32,13 @@ def safe_json(r):
     except:
         return {}
 
-def decode(code_type, code_value):
-        type_map = {
-            "c": {"name": "CPU", "unit": "%"},
-            "r": {"name": "内存", "unit": "MB"},
-            "d": {"name": "硬盘", "unit": "MB"},
-            "t": {"name": "流量", "unit": "GB"}
-        }
-    
-        info = type_map.get(code_type)
-        if not info:
-            return "未知资源"
-    
-        return f"{info['name']} +{code_value}{info['unit']}"
+def decode(code_type, value):
+    return {
+        "cpu": "CPU",
+        "memory": "内存",
+        "disk": "硬盘",
+        "traffic": "流量"
+    }.get(code_type, code_type) + f" +{value}"
 
 def get_instances(session):
     try:
@@ -67,14 +58,13 @@ def redeem(session, code, instance_id):
             timeout=TIMEOUT
         )
         data = safe_json(r)
-        print(data)
         code_data = data.get("todayCode") if isinstance(data.get("todayCode"), dict) else data
 
         if r.status_code == 200 and code_data and "codeType" in code_data:
             result = f"✅ {instance_id}: {decode(code_data['codeType'], code_data['codeValue'])}"
             append_line(result)
             return result
-        result = f"❌ {instance_id}: {data['error']}"
+        result = f"❌ {instance_id}: 失败"
         append_line(result)
         return result
     except Exception as e:
@@ -83,14 +73,14 @@ def redeem(session, code, instance_id):
         return result
 
 def main():
-    # 先清空 result.txt，保证每次运行都是干净文件
+    # 清空 result.txt
     open(RESULT_FILE, "w", encoding="utf-8").close()
 
     try:
         session = build_session()
         codes = [x.strip() for x in os.environ.get("REDEEM_TEXT", "").splitlines() if x.strip()]
         if not codes:
-            append_line("❌ 没有兑换码，退出")
+            append_line("❌ 未获取到兑换码，退出")
             return
 
         instances = get_instances(session)
