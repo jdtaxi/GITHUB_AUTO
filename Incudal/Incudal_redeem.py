@@ -35,13 +35,19 @@ def safe_json(r):
     except:
         return {}
 
-def decode(code_type, value):
-    return {
-        "cpu": "CPU",
-        "memory": "内存",
-        "disk": "硬盘",
-        "traffic": "流量"
-    }.get(code_type, code_type) + f" +{value}"
+def decode(code_type, code_value):
+        type_map = {
+            "c": {"name": "CPU", "unit": "%"},
+            "r": {"name": "内存", "unit": "MB"},
+            "d": {"name": "硬盘", "unit": "MB"},
+            "t": {"name": "流量", "unit": "GB"}
+        }
+    
+        info = type_map.get(code_type)
+        if not info:
+            return "未知资源"
+    
+        return f"{info['name']} +{code_value}{info['unit']}"
 
 def get_instances(session):
     try:
