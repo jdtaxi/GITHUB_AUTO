@@ -1,0 +1,40 @@
+name: Telegram Command
+
+on:
+  repository_dispatch:
+    types: [tg-command]
+
+concurrency:
+  group: tg-bot
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show payload
+        run: |
+          echo "CMD=${{ github.event.client_payload.cmd }}"
+          echo "ARGS=${{ toJson(github.event.client_payload.args) }}"
+          echo "FROM=${{ github.event.client_payload.from }}"
+
+      - name: Execute
+        run: |
+          CMD="${{ github.event.client_payload.cmd }}"
+          case "$CMD" in
+            status)
+              uptime
+              ;;
+            deploy)
+              ./deploy.sh "${{ github.event.client_payload.args[0] }}"
+              ;;
+            restart)
+              echo "restart service"
+              ;;
+            *)
+              echo "Unknown command"
+              exit 1
+          esac
