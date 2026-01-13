@@ -1,4 +1,4 @@
-name: TG Group Listener & Redeem
+name: Incudal TG Group Listener & Redeem
 
 on:
   workflow_dispatch:
