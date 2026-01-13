@@ -68,7 +68,7 @@ def redeem(session, code, instance_id):
             result = f"✅ {instance_id}: {decode(code_data['codeType'], code_data['codeValue'])}"
             append_line(result)
             return result
-        result = f"❌ {instance_id}: 失败"
+        result = f"❌ {instance_id}: {data['error']}"
         append_line(result)
         return result
     except Exception as e:
