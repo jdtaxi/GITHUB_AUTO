@@ -131,8 +131,8 @@ jobs:
                   remaining = LISTEN_SECONDS - elapsed
                   if remaining <= 0:
                       break
-                  print(f"⏱ 监听剩余时间: {int(remaining)} 秒", end="\r", flush=True)
-                  await asyncio.sleep(1)
+                  print(f"⏱ 监听剩余时间: {int(remaining/60)} 分钟", end="\r", flush=True)
+                  await asyncio.sleep(60)
 
               print("\n⏰ 监听结束，发送汇总...", flush=True)
               await send_summary()
