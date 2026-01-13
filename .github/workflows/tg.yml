@@ -19,7 +19,7 @@ jobs:
 
           echo "收到原始内容: $INPUT"
 
-          # 按行转换成数组（安全方法）
+          # 安全按行转换成数组
           mapfile -t lines <<< "$INPUT"
 
           OUTPUT="处理结果:\n"
@@ -27,18 +27,23 @@ jobs:
             OUTPUT+="$((i+1)): ${lines[i]}\n"
           done
 
-          # 保存到 workflow 输出
+          # 保存输出到 workflow 输出变量
           echo "output<<EOF" >> $GITHUB_OUTPUT
           echo -e "$OUTPUT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Send result back to TG
+      - name: Send result back to TG (safe)
         if: always()
         run: |
           CALLBACK_URL="https://tg-github-bot.greenwave1987.workers.dev/callback"
           CHAT_ID="${{ github.event.client_payload.chat_id }}"
           OUT="${{ steps.process.outputs.output || '处理失败' }}"
 
-          curl -X POST "$CALLBACK_URL" \
-            -H "Content-Type: application/json" \
-            -d "{\"chat_id\":$CHAT_ID,\"text\":\"$OUT\"}"
+          # 使用 jq 构造安全 JSON，避免换行和特殊字符破坏
+          JSON=$(jq -n --arg chat_id "$CHAT_ID" --arg text "$OUT" '{chat_id:$chat_id, text:$text}')
+
+          # 重试机制，防止偶尔网络抖动
+          for i in {1..3}; do
+            curl -X POST "$CALLBACK_URL" -H "Content-Type: application/json" -d "$JSON" && break
+            sleep 2
+          done
