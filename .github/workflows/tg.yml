@@ -13,21 +13,21 @@ jobs:
       - name: Process message
         id: process
         run: |
-          #!/bin/bash
+          set +e  # 避免 step 因非零退出码失败
           INPUT="${{ github.event.client_payload.text }}"
           CHAT_ID="${{ github.event.client_payload.chat_id }}"
 
           echo "收到原始内容: $INPUT"
 
-          # 按行转换成数组
-          IFS=$'\n' read -r -d '' -a lines <<< "$INPUT"$'\0'
+          # 按行转换成数组（安全方法）
+          mapfile -t lines <<< "$INPUT"
 
           OUTPUT="处理结果:\n"
           for i in "${!lines[@]}"; do
             OUTPUT+="$((i+1)): ${lines[i]}\n"
           done
 
-          # 保存输出到 workflow 输出变量
+          # 保存到 workflow 输出
           echo "output<<EOF" >> $GITHUB_OUTPUT
           echo -e "$OUTPUT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -35,9 +35,9 @@ jobs:
       - name: Send result back to TG
         if: always()
         run: |
-          CALLBACK_URL="https://tg-github-bot.greenwave1987.workers.dev/callback"
+          CALLBACK_URL="https://<你的-worker域名>/callback"
           CHAT_ID="${{ github.event.client_payload.chat_id }}"
-          OUT="${{ steps.process.outputs.output }}"
+          OUT="${{ steps.process.outputs.output || '处理失败' }}"
 
           curl -X POST "$CALLBACK_URL" \
             -H "Content-Type: application/json" \
