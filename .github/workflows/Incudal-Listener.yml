@@ -183,10 +183,11 @@ jobs:
 
           def decode(code_type, value):
               return {
-                  "cpu": "CPU",
-                  "memory": "内存",
-                  "disk": "硬盘",
-                  "traffic": "流量"
+                  "c": "CPU",
+                  "m": "内存",
+                  "d": "硬盘",
+                  "t": "流量",
+                  "h": "盲盒"
               }.get(code_type, code_type) + f" +{value}"
 
           def get_instances(session):
