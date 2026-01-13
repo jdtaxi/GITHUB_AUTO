@@ -67,7 +67,9 @@ def main():
             line = redeem(session, code, ins["id"])
             lines.append("  " + line)
 
-    with open("result.txt", "w", encoding="utf-8") as f:
+    # 确保 result.txt 在当前工作目录
+    result_file = os.path.join(os.getcwd(), "result.txt")
+    with open(result_file, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
     print("✅ 全部兑换完成")
