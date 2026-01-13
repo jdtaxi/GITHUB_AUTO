@@ -59,7 +59,7 @@ jobs:
           TG_APIS = os.getenv("TG_APIS")
           GROUP = os.getenv("GROUP")
           TARGET_IDS = os.getenv("TARGET_IDS", "").split(",")
-          LISTEN_SECONDS = int(os.getenv("LISTEN_SECONDS", "60"))
+          LISTEN_SECONDS = int(os.getenv("LISTEN_SECONDS", "120"))
           USE_API_ID = os.getenv("USE_API_ID")
           USER_SESSION = os.getenv("USER_SESSION")
 
