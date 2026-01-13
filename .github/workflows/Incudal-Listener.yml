@@ -36,7 +36,7 @@ jobs:
           GROUP: "@incudal_com"
 
           # 目标成员 ID
-          TARGET_IDS: "-1003435357437,1966630851"
+          TARGET_IDS: "3435357437,1966630851"
 
           # 监听时间（秒）
           LISTEN_SECONDS: 21600
