@@ -33,7 +33,7 @@ jobs:
           TG12965303: ${{ secrets.TG12965303 }}
 
           # 群聊信息
-          GROUP: "@incudal_com"
+          GROUP: "2013901583"
 
           # 目标成员 ID
           TARGET_IDS: "3435357437,1966630851"
