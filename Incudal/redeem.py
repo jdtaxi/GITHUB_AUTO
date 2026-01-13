@@ -6,7 +6,6 @@ BASE_URL = "https://incudal.com"
 TIMEOUT = 15
 
 # ========== Session ==========
-
 def build_session():
     data = json.loads(os.environ["USER_SESSION"])
     s = requests.Session()
@@ -34,7 +33,6 @@ def decode(code_type, value):
     }.get(code_type, code_type) + f" +{value}"
 
 # ========== API ==========
-
 def get_instances(session):
     r = session.get(f"{BASE_URL}/api/instances", timeout=TIMEOUT)
     r.raise_for_status()
@@ -47,14 +45,12 @@ def redeem(session, code, instance_id):
         timeout=TIMEOUT
     )
     data = safe_json(r)
-
     code_data = data.get("todayCode") if isinstance(data.get("todayCode"), dict) else data
     if r.status_code == 200 and code_data and "codeType" in code_data:
         return f"✅ {instance_id}: {decode(code_data['codeType'], code_data['codeValue'])}"
     return f"❌ {instance_id}: 失败"
 
 # ========== 主流程 ==========
-
 def main():
     session = build_session()
     codes = [x.strip() for x in os.environ["REDEEM_TEXT"].splitlines() if x.strip()]
