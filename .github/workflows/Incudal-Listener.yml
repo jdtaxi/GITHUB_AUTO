@@ -1,4 +1,4 @@
-name: Incudal TG 监听
+name: 监听Incudal频道 兑换
 
 on:
   schedule:
