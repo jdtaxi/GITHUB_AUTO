@@ -1,0 +1,131 @@
+name: TG Group Listener & Redeem
+
+on:
+  workflow_dispatch:
+
+jobs:
+  tg-listen:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install telethon requests
+
+      - name: Run TG Listener
+        env:
+          # 多账号 TG 登录信息，api_id:api_hash,api_id:api_hash
+          TG_APIS: ${{ secrets.TG_APIS }}
+          
+          # 每个 TG 账号对应的 session base64，格式 TG<api_id>
+          # 例如 TG12345
+          TG11027029: ${{ secrets.TG11027029 }}
+          TG12965303: ${{ secrets.TG12965303 }}
+
+          # 可选代理
+          PROXIES: ${{ secrets.PROXIES }}
+
+          # 群聊信息
+          GROUP: "@incudal_com"
+
+          # 目标成员 ID
+          TARGET_IDS: "-1003435357437,1966630851"
+
+          # 匹配到消息后执行命令
+          COMMAND: "python scripts/redeem.py"
+
+          # 监听时间（秒）
+          LISTEN_SECONDS: 60
+
+          # 指定要使用的 TG 账号
+          USE_API_ID: "11027029"
+
+        run: |
+          mkdir -p scripts
+          cat > scripts/listen_group.py << 'EOF'
+          import asyncio
+          import os
+          import base64
+          import subprocess
+          from telethon import TelegramClient, events
+          
+          TG_APIS = os.getenv("TG_APIS")
+          PROXIES = os.getenv("PROXIES", "").strip()
+          GROUP = os.getenv("GROUP")
+          TARGET_IDS = os.getenv("TARGET_IDS", "").split(",")
+          COMMAND = os.getenv("COMMAND")
+          LISTEN_SECONDS = int(os.getenv("LISTEN_SECONDS", "60"))
+          USE_API_ID = os.getenv("USE_API_ID")  # 指定登录账号
+
+          RESULTS = []
+
+          proxy = None
+          if PROXIES:
+              proxy_lines = [p.strip() for p in PROXIES.splitlines() if p.strip()]
+              proxy = proxy_lines[0] if proxy_lines else None
+
+          # 获取指定账号信息
+          api_id = None
+          api_hash = None
+          session_b64 = None
+          for item in TG_APIS.split(","):
+              id_, hash_ = item.split(":")
+              if id_ == USE_API_ID:
+                  api_id = int(id_)
+                  api_hash = hash_
+                  session_b64 = os.getenv(f"TG{id_}")
+                  break
+
+          if not all([api_id, api_hash, session_b64]):
+              raise SystemExit(f"❌ 未找到指定 TG 账号 {USE_API_ID}")
+
+          session_file = f"TG{api_id}.session"
+          with open(session_file, "wb") as f:
+              f.write(base64.b64decode(session_b64))
+
+          client = TelegramClient(session_file, api_id, api_hash, proxy=None)
+
+          @client.on(events.NewMessage(chats=GROUP))
+          async def handler(event):
+              sender = await event.get_sender()
+              text = event.raw_text
+              sender_id = str(sender.id)
+
+              print(f"收到消息 | 用户: {sender.username} | ID: {sender_id} | 内容: {text}")
+
+              if sender_id in TARGET_IDS:
+                  print(f"匹配到目标用户 {sender_id}，执行命令: {COMMAND}")
+                  try:
+                      result = subprocess.run(COMMAND, shell=True, capture_output=True, text=True)
+                      print(f"命令输出:\n{result.stdout}\n{result.stderr}")
+                      RESULTS.append(f"用户 {sender.username}({sender_id}) 消息触发：\n{result.stdout}")
+                  except Exception as e:
+                      print(f"执行命令失败: {e}")
+                      RESULTS.append(f"用户 {sender.username}({sender_id}) 执行失败：{e}")
+
+          async def send_summary():
+              text = "📊 TG 消息触发结果\n\n" + "\n\n".join(RESULTS) if RESULTS else "📊 没有触发任何命令"
+              await client.send_message("me", text)
+
+          async def main():
+              await client.start()
+              print(f"✅ 已登录 TG 用户 {api_id}，开始监听群聊消息...")
+              await asyncio.sleep(LISTEN_SECONDS)
+              await send_summary()
+              await client.disconnect()
+              print("监听结束")
+
+          if __name__ == "__main__":
+              asyncio.run(main())
+          EOF
+
+          python scripts/listen_group.py
