@@ -1,55 +1,44 @@
-name: Telegram Command
+name: Process Text from TG
 
 on:
   repository_dispatch:
-    types: [tg-command]
+    types: [process-text]
 
 jobs:
-  run:
+  process:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run command
-        id: exec
+      - name: Process message
+        id: process
         run: |
-          CMD="${{ github.event.client_payload.cmd }}"
-          ARGS="${{ toJson(github.event.client_payload.args) }}"
-          OUTPUT=""
+          #!/bin/bash
+          INPUT="${{ github.event.client_payload.text }}"
+          CHAT_ID="${{ github.event.client_payload.chat_id }}"
 
-          case "$CMD" in
-            test)
-              OUTPUT="✅ repository_dispatch 测试命令触发成功！"
-              ;;
-            status)
-              OUTPUT=$(uptime)
-              ;;
-            deploy)
-              OUTPUT="模拟部署: $ARGS"
-              ;;
-            restart)
-              OUTPUT="服务已重启"
-              ;;
-            *)
-              OUTPUT="未知命令: $CMD"
-              ;;
-          esac
+          echo "收到原始内容: $INPUT"
 
+          # 按行转换成数组
+          IFS=$'\n' read -r -d '' -a lines <<< "$INPUT"$'\0'
+
+          OUTPUT="处理结果:\n"
+          for i in "${!lines[@]}"; do
+            OUTPUT+="$((i+1)): ${lines[i]}\n"
+          done
+
+          # 保存输出到 workflow 输出变量
           echo "output<<EOF" >> $GITHUB_OUTPUT
-          echo "$OUTPUT" >> $GITHUB_OUTPUT
+          echo -e "$OUTPUT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Send result to Telegram
+      - name: Send result back to TG
         if: always()
         run: |
+          CALLBACK_URL="https://<你的-worker域名>/callback"
           CHAT_ID="${{ github.event.client_payload.chat_id }}"
-          CMD="${{ github.event.client_payload.cmd }}"
-          OUT="${{ steps.exec.outputs.output }}"
-          STATUS="${{ job.status }}"
-          CALLBACK_URL="https://tg-github-bot.greenwave1987.workers.dev/callback"
-
-          TEXT="*命令:* $CMD\n*状态:* $STATUS\n\`\`\`\n$OUT\n\`\`\`"
+          OUT="${{ steps.process.outputs.output }}"
 
           curl -X POST "$CALLBACK_URL" \
             -H "Content-Type: application/json" \
-            -d "{\"chat_id\":$CHAT_ID,\"text\":\"$TEXT\"}"
+            -d "{\"chat_id\":$CHAT_ID,\"text\":\"$OUT\"}"
