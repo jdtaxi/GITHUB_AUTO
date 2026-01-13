@@ -3,7 +3,7 @@ name: Leaflow 自动登录签到
 on:
   workflow_dispatch:
   schedule:
-    - cron: "5 0 * * *"   # 北京时间 08:05
+    - cron: "5 0,12 * * *"   # 北京时间 08:05
 
 concurrency:
   group: leaflow-checkin
