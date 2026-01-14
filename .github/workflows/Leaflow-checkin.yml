@@ -30,39 +30,22 @@ jobs:
       - name: 📦 Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git build-essential libnss3 libatk1.0-0 libatk-bridge2.0-0 \
-          libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libgbm1 libasound2 wget || true
+          sudo apt-get install -y \
+            git build-essential tinyproxy socat \
+            libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+            libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
+            libxfixes3 libgbm1 libasound2 || true
 
       # ===============================
-      # 3proxy：源码编译
+      # 启动本地 SOCKS5 映射（每个账号独立端口）
       # ===============================
-      - name: 🧩 Build & Install 3proxy
+      - name: 🚀 Start local proxies
         run: |
-          git clone https://github.com/3proxy/3proxy.git
-          cd 3proxy
-          make -f Makefile.Linux
-          sudo cp bin/3proxy /usr/local/bin/3proxy
-          3proxy --version || true
-
-      # ===============================
-      # 启动本地 SOCKS5 转发
-      # ===============================
-      - name: 🚀 Start local SOCKS5 proxies
-        run: |
-          mkdir -p /tmp/3proxy
-          CONF=/tmp/3proxy/3proxy.cfg
-          echo "daemon" > $CONF
-          echo "nserver 8.8.8.8" >> $CONF
-          echo "nscache 65536" >> $CONF
-          echo "timeouts 1 5 30 60 180 1800 15 60" >> $CONF
-          echo "log /tmp/3proxy/3proxy.log" >> $CONF
-          echo "auth strong" >> $CONF
-
+          mkdir -p /tmp/leaflow_proxies
           IFS=',' read -ra PROXIES <<< "$SOCKS5_INFO"
-          PORT=1081
-          USERS_LINE="users"
-
-          for p in "${PROXIES[@]}"; do
+          BASE_PORT=1081
+          for idx in "${!PROXIES[@]}"; do
+            p=${PROXIES[$idx]}
             USERPASS=${p%@*}
             HOSTPORT=${p#*@}
             USER=${USERPASS%%:*}
@@ -70,15 +53,12 @@ jobs:
             HOST=${HOSTPORT%%:*}
             RPORT=${HOSTPORT#*:}
 
-            USERS_LINE="$USERS_LINE $USER:CL:$PASS"
-            echo "socks -p$PORT -i127.0.0.1 -e$HOST" >> $CONF
-            echo "✅ 映射 $HOST:$RPORT → 127.0.0.1:$PORT"
-            PORT=$((PORT+1))
+            LOCAL_PORT=$((BASE_PORT + idx))
+            echo "✅ 映射 $HOST:$RPORT → 127.0.0.1:$LOCAL_PORT"
+
+            # 使用 socat 映射 SOCKS5 → 本地 TCP 端口
+            nohup socat TCP-LISTEN:$LOCAL_PORT,fork SOCKS5:$HOST:0,socksuser=$USER,sockspass=$PASS &
           done
-
-          echo $USERS_LINE >> $CONF
-
-          sudo 3proxy $CONF &
           sleep 3
 
       - name: 🔍 Verify local proxy ports
