@@ -52,7 +52,7 @@ jobs:
           git clone https://github.com/3proxy/3proxy.git
           cd 3proxy
           make -f Makefile.Linux
-          sudo cp src/3proxy /usr/local/bin/3proxy
+          sudo cp bin/3proxy /usr/local/bin/3proxy
           3proxy --version || true
 
       # ===============================
