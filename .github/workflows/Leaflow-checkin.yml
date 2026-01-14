@@ -68,8 +68,11 @@ jobs:
           echo "daemon" > $CONF
           echo "nserver 8.8.8.8" >> $CONF
           echo "nscache 65536" >> $CONF
-          echo "allow *" >> $CONF   # ✅ 这一行是关键
-
+          echo "allow *" >> $CONF      # ✅ 关键放行行
+          
+          PORT=1081
+          IFS=',' read -ra PROXIES <<< "$SOCKS5_INFO"
+          
           for p in "${PROXIES[@]}"; do
             USERPASS=${p%@*}
             HOSTPORT=${p#*@}
@@ -77,15 +80,15 @@ jobs:
             PASS=${USERPASS#*:}
             HOST=${HOSTPORT%%:*}
             RPORT=${HOSTPORT#*:}
-
+          
             echo "auth strong" >> $CONF
             echo "users $USER:CL:$PASS" >> $CONF
             echo "socks -p$PORT -i127.0.0.1 -e$HOST" >> $CONF
-
+          
             echo "✅ 映射 $HOST:$RPORT → 127.0.0.1:$PORT"
             PORT=$((PORT+1))
           done
-
+          
           sudo 3proxy $CONF
           sleep 2
 
