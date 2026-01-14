@@ -140,12 +140,6 @@ async def main():
         raise RuntimeError("❌ 未设置 CONFIG_PASSWORD")
     config = getconfig(password)
 
-    proxy = ""
-    if useproxy:
-        proxy_cfg = config.get("proxy","")
-        if proxy_cfg:
-            proxy = proxy_cfg.get("value","")
-
     LF_INFO = config.get("LF_INFO","")
     if not LF_INFO:
         raise RuntimeError("❌ 配置文件中不存在 LF_INFO")
@@ -166,11 +160,11 @@ async def main():
 
         # ---------- 代理测试 ----------
         proxyurl = None
-        try:
-            ok, msg, proxyurl = check_socks5_proxy(proxy[idx])
+        if useproxy::
+            ok, msg, proxyurl = check_socks5_proxy()
             print(f"{'✅' if ok else '❌'} {username} 测试代理: {msg}")
             results.append(f"{'✅' if ok else '❌'} {username} 测试代理— {msg}")
-        except Exception as e:
+        else:
             print(f"❌ {username} 代理测试异常: {e}")
             results.append(f"❌ {username} — {e}")
 
