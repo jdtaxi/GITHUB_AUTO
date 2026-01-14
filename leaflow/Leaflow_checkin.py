@@ -76,11 +76,11 @@ def load_cookies():
 
 # ================= 单账号流程 =================
 
-def process_account(email, password, cookies_map):
+def process_account(email, password, cookies_map,proxy= None):
     print("=" * 60)
     print(f"👤 处理账号: {email}")
 
-    pw, browser, ctx, page = open_browser()
+    pw, browser, ctx, page = open_browser(proxy)
     note = ""
 
     try:
@@ -113,7 +113,7 @@ def process_account(email, password, cookies_map):
 
     # ---------- API 签到 ----------
     print("📡 执行 API 签到")
-    ok, msg = perform_token_checkin(cookies_map[email], email, checkin_url, main_site,headers)
+    ok, msg = perform_token_checkin(cookies_map[email], email, checkin_url, main_site,headers,proxy= None)
     print(f"ℹ️ API 签到: {ok},{msg}")
     return ok, f"{note} | {msg}"
 
@@ -127,7 +127,11 @@ def main():
         raise RuntimeError("❌ 未设置 CONFIG_PASSWORD")
     config = getconfig(password)
 
-    
+    if useproxy:
+        proxy= config.get("proxy","")
+    if proxy:
+        proxy= config.get("value","")
+        
     LF_INFO= config.get("LF_INFO","")
     
     if not LF_INFO:
@@ -139,17 +143,17 @@ def main():
     cookies_map = load_cookies()
     results = []
 
-    for acc in accounts:
+    for idx, acc in enumerate(accounts):
         usename = acc.get("usename")
         password = acc.get("password")
     
         if not usename or not password:
-            print("⚠ 跳过非法账号:", acc)
+            print("⚠ 跳过非法账号{idx+1}:", acc)
             continue
-        print(f'----------{usename}----------')
+        print(f'----------【{idx+1}】{usename}----------')
         return
         try:
-            ok, msg = process_account(usename, password, cookies_map)
+            ok, msg = process_account(usename, password, cookies_map,proxy[idx])
             results.append(f"{'✅' if ok else '❌'} {usename} — {msg}")
         except Exception as e:
             results.append(f"❌ {usename} — {e}")
