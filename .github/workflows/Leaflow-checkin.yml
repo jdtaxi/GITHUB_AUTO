@@ -40,7 +40,8 @@ jobs:
             libxdamage1 \
             libxfixes3 \
             libgbm1 \
-            libasound2 || true
+            libasound2-data \
+            libasound2-tiny || true
 
       - name: 📦 Install Python dependencies
         run: |
