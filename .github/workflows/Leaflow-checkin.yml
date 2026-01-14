@@ -16,7 +16,6 @@ jobs:
 
     env:
       TZ: Asia/Shanghai
-      SOCKS5_INFO: ${{ secrets.SOCKS5_INFO }}
 
     steps:
       - name: 📥 Checkout repository
@@ -30,65 +29,23 @@ jobs:
       - name: 📦 Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git build-essential socat tinyproxy \
-            libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
-            libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
-            libxfixes3 libgbm1 || true
-
-      # ===============================
-      # 启动本地 SOCKS5 映射（每个账号独立端口）
-      # ===============================
-      - name: 🚀 Start local proxies
-        run: |
-          mkdir -p /tmp/leaflow_proxies
-          IFS=',' read -ra PROXIES <<< "$SOCKS5_INFO"
-          BASE_PORT=1081
-
-          for idx in "${!PROXIES[@]}"; do
-            p=${PROXIES[$idx]}
-            USERPASS=${p%@*}
-            HOSTPORT=${p#*@}
-            USER=${USERPASS%%:*}
-            PASS=${USERPASS#*:}
-            HOST=${HOSTPORT%%:*}
-            RPORT=${HOSTPORT#*:}
-            LOCAL_PORT=$((BASE_PORT + idx))
-
-            echo "✅ 映射 $HOST:$RPORT → 127.0.0.1:$LOCAL_PORT"
-
-            # 生成 tinyproxy 配置文件
-            CONF_FILE="/tmp/leaflow_proxies/tinyproxy_$LOCAL_PORT.conf"
-            cat <<EOF >$CONF_FILE
-Port $LOCAL_PORT
-Listen 127.0.0.1
-Timeout 600
-DefaultErrorFile "/usr/share/tinyproxy/default.html"
-StatFile "/usr/share/tinyproxy/stats.html"
-MaxClients 100
-MinSpareServers 5
-MaxSpareServers 20
-StartServers 10
-LogFile "/tmp/leaflow_proxies/tinyproxy_$LOCAL_PORT.log"
-LogLevel Info
-Allow 127.0.0.1
-ConnectPort 443
-ConnectPort 80
-ViaProxyName "LeaflowProxy"
-EOF
-
-            # 使用 tinyproxy 启动本地 HTTP 代理
-            nohup tinyproxy -c $CONF_FILE &
-          done
-          sleep 3
-
-      - name: 🔍 Verify local proxy ports
-        run: |
-          ss -lntp | grep 108 || true
+          sudo apt-get install -y \
+            libnss3 \
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libcups2 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libgbm1 \
+            libasound2 || true
 
       - name: 📦 Install Python dependencies
         run: |
           pip install -U pip
-          pip install playwright requests[socks] pynacl cryptography
+          pip install playwright requests pynacl
           playwright install chromium
 
       - name: ▶️ Run Leaflow Checkin
@@ -98,7 +55,6 @@ EOF
           REPO_TOKEN:       ${{ secrets.REPO_TOKEN }}
           TG_BOT_TOKEN:     ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID:       ${{ secrets.TG_CHAT_ID }}
-          CONFIG_PASSWORD: ${{ secrets.CONFIG_PASSWORD }}
         run: |
           python -u leaflow/Leaflow_checkin.py
 
