@@ -56,21 +56,23 @@ jobs:
           3proxy --version || true
 
       # ===============================
-      # 启动本地 SOCKS5 转发（远程带密码）
+      # 启动本地 SOCKS5 转发
       # ===============================
       - name: 🚀 Start local SOCKS5 proxies
         run: |
           mkdir -p /tmp/3proxy
           CONF=/tmp/3proxy/3proxy.cfg
-          echo "daemon" > $CONF
-          echo "maxconn 1000" >> $CONF
-          echo "nserver 8.8.8.8" >> $CONF
-          echo "nscache 65536" >> $CONF
-          echo "timeouts 1 5 30 60 180 1800 15 60" >> $CONF
-          echo "log /tmp/3proxy/3proxy.log D" >> $CONF
-          echo "auth none" >> $CONF   # 本地不需要认证
 
-          # 读取 SOCKS5_INFO 并映射本地端口
+          # 基础配置
+          echo "daemon
+          maxconn 1000
+          nserver 8.8.8.8
+          nscache 65536
+          timeouts 1 5 30 60 180 1800 15 60
+          log /tmp/3proxy/3proxy.log D
+          auth none" > $CONF
+
+          # 读取 SOCKS5_INFO 并生成映射
           IFS=',' read -ra PROXIES <<< "$SOCKS5_INFO"
           PORT=1081
 
