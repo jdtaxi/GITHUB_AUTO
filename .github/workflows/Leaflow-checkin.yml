@@ -3,7 +3,7 @@ name: Leaflow 自动登录签到
 on:
   workflow_dispatch:
   schedule:
-    - cron: "5 0,12 * * *"   # 北京时间 08:05
+    - cron: "5 0,12 * * *"
 
 concurrency:
   group: leaflow-checkin
@@ -30,16 +30,15 @@ jobs:
       - name: 📦 Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            git build-essential socat tinyproxy \
+          sudo apt-get install -y git build-essential tinyproxy \
             libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
             libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
             libxfixes3 libgbm1 libasound2 || true
 
       # ===============================
-      # 启动本地 SOCKS5 映射（每个账号独立端口）
+      # 启动 tinyproxy 映射 SOCKS5
       # ===============================
-      - name: 🚀 Start local proxies
+      - name: 🚀 Start local proxies via tinyproxy
         run: |
           mkdir -p /tmp/leaflow_proxies
           IFS=',' read -ra PROXIES <<< "$SOCKS5_INFO"
@@ -52,12 +51,18 @@ jobs:
             PASS=${USERPASS#*:}
             HOST=${HOSTPORT%%:*}
             RPORT=${HOSTPORT#*:}
-
+            
             LOCAL_PORT=$((BASE_PORT + idx))
+            CONF_FILE="/tmp/leaflow_proxies/tinyproxy_$LOCAL_PORT.conf"
+            echo "Port $LOCAL_PORT" > $CONF_FILE
+            echo "Timeout 600" >> $CONF_FILE
+            echo "Listen 127.0.0.1" >> $CONF_FILE
+            echo "ConnectPort $RPORT" >> $CONF_FILE
+            echo "Allow 127.0.0.1" >> $CONF_FILE
+            echo "Upstream $USER:$PASS@$HOST:$RPORT" >> $CONF_FILE
             echo "✅ 映射 $HOST:$RPORT → 127.0.0.1:$LOCAL_PORT"
 
-            # 使用 socat 映射 SOCKS5 → 本地 TCP 端口
-            nohup socat TCP-LISTEN:$LOCAL_PORT,fork SOCKS5:$HOST:$RPORT,socksuser=$USER,sockspass=$PASS &
+            sudo tinyproxy -c $CONF_FILE &
           done
           sleep 3
 
