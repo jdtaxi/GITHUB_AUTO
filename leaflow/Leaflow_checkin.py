@@ -161,7 +161,7 @@ async def main():
         # ---------- 代理测试 ----------
         proxyurl = None
         if useproxy::
-            ok, msg, proxyurl = check_socks5_proxy()
+            ok, msg, proxyurl = check_socks5_proxy(idx)
             print(f"{'✅' if ok else '❌'} {username} 测试代理: {msg}")
             results.append(f"{'✅' if ok else '❌'} {username} 测试代理— {msg}")
         else:
