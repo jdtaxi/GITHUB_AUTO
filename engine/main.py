@@ -226,25 +226,10 @@ def session_from_cookies(cookies, headers=None, proxy=None):
     # ---------- 代理设置 ----------
     if proxy:
         try:
-            if isinstance(proxy, dict):
-                # JSON 格式
-                proxy_type = proxy.get("type", "socks5")
-                server = proxy["server"]
-                port = proxy["port"]
-                username = proxy.get("username")
-                password = proxy.get("password")
-                if username and password:
-                    proxy_url = f"{proxy_type}://{username}:{password}@{server}:{port}"
-                else:
-                    proxy_url = f"{proxy_type}://{server}:{port}"
-            elif isinstance(proxy, str):
-                proxy_url = proxy
-            else:
-                raise ValueError("不支持的 proxy 格式")
-
+  
             session.proxies.update({
-                "http": proxy_url,
-                "https": proxy_url,
+                "http": proxy,
+                "https": proxy,
             })
             print(f"🌐 已设置代理: {proxy_url}")
         except Exception as e:
