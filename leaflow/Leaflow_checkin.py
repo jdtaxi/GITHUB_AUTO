@@ -5,7 +5,6 @@
 Leaflow Playwright + API 自动签到
 依赖 engine 目录中的模块
 """
-import asyncio
 import os
 import sys
 import json
@@ -26,9 +25,7 @@ from engine.playwright_login import (
 )
 from engine.main import (
     perform_token_checkin,
-    SecretUpdater,
-    getconfig,
-    check_socks5_proxy
+    SecretUpdater
 )
 
 # ================= 基础配置 =================
@@ -45,7 +42,6 @@ headers={
     "Connection": "keep-alive",
     "Upgrade-Insecure-Requests": "1"
 }
-
 # ================= 账号 / Cookies =================
 
 def load_accounts():
@@ -79,119 +75,73 @@ def load_cookies():
 
 # ================= 单账号流程 =================
 
-async def process_account(email, password, cookies_map, proxy=None):
+def process_account(email, password, cookies_map):
     print("=" * 60)
-    print(f"👤 开始处理账号: {email}")
+    print(f"👤 处理账号: {email}")
 
-    pw, browser, ctx, page = await open_browser(proxy)
+    pw, browser, ctx, page = open_browser()
     note = ""
 
     try:
-        # ---------- 浏览器出口 IP ----------
-        await page.goto("https://api.ipify.org")
-        ip = await page.text_content("body")
-        print(f"🌍 浏览器出口 IP: {ip}")
-        return
-
         # ---------- cookies 尝试 ----------
         if email in cookies_map:
             print("🍪 尝试复用 cookies")
-            await ctx.add_cookies(cookies_map[email])       # ✅ await
-            if await cookies_ok(page):                       # ✅ await
+            ctx.add_cookies(cookies_map[email])
+
+            if cookies_ok(page):
                 print("✅ cookies 有效")
                 note = "cookies复用"
             else:
                 print("♻ cookies 已失效")
                 raise RuntimeError("cookies expired")
         else:
-            print("⚠ 未找到 cookies，执行登录")
             raise RuntimeError("no cookies")
 
-    except Exception as e:
-        print(f"🔐 执行 Playwright 登录: {e}")
-        cookies = await login_and_get_cookies(page, email, password)   # ✅ await
+    except Exception:
+        # ---------- 登录 ----------
+        print("🔐 执行 Playwright 登录")
+        cookies = login_and_get_cookies(page, email, password)
         cookies_map[email] = cookies
         note = "重新登录"
 
     finally:
         # 同步 cookies
-        cookies_map[email] = await ctx.cookies()     # ✅ await
-        await browser.close()                         # ✅ await
-        await pw.stop()                               # ✅ await
-        print("💾 cookies 已同步，浏览器已关闭")
+        cookies_map[email] = ctx.cookies()
+        browser.close()
+        pw.stop()
 
     # ---------- API 签到 ----------
     print("📡 执行 API 签到")
-    try:
-        # 如果 perform_token_checkin 本身是 async，记得 await
-        ok, msg = await perform_token_checkin(cookies_map[email], email, checkin_url, main_site, headers, proxy=None)
-        print(f"ℹ️ API 签到结果: {ok}, {msg}")
-    except Exception as e:
-        ok, msg = False, f"签到失败: {e}"
-        print(f"❌ API 签到异常: {e}")
-
+    ok, msg = perform_token_checkin(cookies_map[email], email, checkin_url, main_site,headers)
+    print(f"ℹ️ API 签到: {ok},{msg}")
     return ok, f"{note} | {msg}"
+
 
 # ================= Main =================
 
-async def main():
-    useproxy = True
-    password = os.getenv("CONFIG_PASSWORD","").strip()
-    if not password:
-        raise RuntimeError("❌ 未设置 CONFIG_PASSWORD")
-    config = getconfig(password)
-
-    LF_INFO = config.get("LF_INFO","")
-    if not LF_INFO:
-        raise RuntimeError("❌ 配置文件中不存在 LF_INFO")
-    print(f'ℹ️ 已读取: {LF_INFO.get("description","")}')
-
-    accounts = LF_INFO.get("value","")
+def main():
+    accounts = load_accounts()
     cookies_map = load_cookies()
     results = []
 
-    for idx, acc in enumerate(accounts):
-        username = acc.get("usename")
-        password = acc.get("password")
-    
-        if not username or not password:
-            print(f"⚠ 跳过非法账号 {idx+1}: {acc}")
-            continue
-        print(f'----------【{idx+1}】{username}----------')
-
-        # ---------- 代理测试 ----------
-        proxyurl = None
-        if useproxy:
-            res = check_socks5_proxy(idx)
-            if not res[0]:
-                print(f"❌ {username} — 代理不可用，跳过")
-                results.append(f"❌ {username} — 代理不可用")
-                continue
-            
-            ok, ip, proxy_url = res
-            print(f"{'✅' if ok else '❌'} {username} 测试代理: {msg}")
-            results.append(f"{'✅' if ok else '❌'} {username} 测试代理— {msg}")
-        else:
-            print(f"❌ {username} 代理测试异常: {e}")
-            results.append(f"❌ {username} — {e}")
-
-        # ---------- 执行账号签到 ----------
+    for email, pwd in accounts.items():
         try:
-            ok, msg = await process_account(username, password, cookies_map, proxyurl)
-            results.append(f"{'✅' if ok else '❌'} {username} — {msg}")
+            ok, msg = process_account(email, pwd, cookies_map)
+            results.append(f"{'✅' if ok else '❌'} {email} — {msg}")
         except Exception as e:
-            print(f"❌ {username} 签到异常: {e}")
-            results.append(f"❌ {username} — {e}")
+            results.append(f"❌ {email} — {e}")
 
     # ---------- 回写 cookies ----------
-    print("💾 回写 cookies")
-    SecretUpdater("LEAFLOW_COOKIES").update(json.dumps(cookies_map, ensure_ascii=False))
+    SecretUpdater("LEAFLOW_COOKIES").update(
+        json.dumps(cookies_map, ensure_ascii=False)
+    )
 
     # ---------- 通知 ----------
-    print("📨 发送签到汇总通知")
-    send_notify(title="Leaflow 自动签到汇总", content="\n".join(results))
-    print("✅ 全部完成")
+    send_notify(
+        title="Leaflow 自动签到汇总",
+        content="\n".join(results)
+    )
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
