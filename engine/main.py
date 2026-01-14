@@ -7,6 +7,7 @@ from nacl import public, encoding
 import json
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from hashlib import sha256
+from pathlib import Path
 
 REPO = os.getenv("GITHUB_REPOSITORY")
 REPO_TOKEN = os.getenv("REPO_TOKEN")
@@ -53,7 +54,30 @@ def decrypt_json(encrypted_str: str, password: str) -> dict:
 
     except Exception as e:
         raise ValueError(f"解密失败: {e}")
+        
+def getconfig(password: str) -> dict:
+    """
+    从脚本上一级目录读取 config.enc 并解密
+    """
+    # 当前脚本所在目录
+    current_dir = Path(__file__).resolve().parent
+    # 上一级目录
+    parent_dir = current_dir.parent
+    # config.enc 路径
+    config_path = parent_dir / "config.enc"
 
+    if not config_path.exists():
+        raise FileNotFoundError(f"❌ 找不到 config.enc: {config_path}")
+
+    encrypted_content = config_path.read_text(encoding="utf-8").strip()
+
+    try:
+        data = decrypt_json(encrypted_content, password)
+        print("✅ 解密成功")
+        return data
+    except ValueError as e:
+        print("❌ 解密失败:", e)
+        raise
 # ==================================================
 # GitHub Secret 回写
 # ==================================================
