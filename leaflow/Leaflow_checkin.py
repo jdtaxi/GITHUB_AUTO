@@ -162,7 +162,7 @@ def main():
             results.append(f"❌ {usename} — {e}")
 
         try:
-            ok, msg = process_account(usename, password, cookies_map，proxyurl)
+            ok, msg = process_account(usename, password, cookies_map,proxyurl)
             results.append(f"{'✅' if ok else '❌'} {usename} — {msg}")
         except Exception as e:
             results.append(f"❌ {usename} — {e}")
