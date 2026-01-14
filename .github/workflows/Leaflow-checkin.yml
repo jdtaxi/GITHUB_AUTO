@@ -58,25 +58,23 @@ jobs:
 
             # 生成 tinyproxy 配置文件
             CONF_FILE="/tmp/leaflow_proxies/tinyproxy_$LOCAL_PORT.conf"
-            cat <<EOF > $CONF_FILE
-            Port $LOCAL_PORT
-            Listen 127.0.0.1
-            Timeout 600
-            DefaultErrorFile "/usr/share/tinyproxy/default.html"
-            StatFile "/usr/share/tinyproxy/stats.html"
-            MaxClients 100
-            MinSpareServers 5
-            MaxSpareServers 20
-            StartServers 10
-            LogFile "/tmp/leaflow_proxies/tinyproxy_$LOCAL_PORT.log"
-            LogLevel Info
-            Allow 127.0.0.1
-            ConnectPort 443
-            ConnectPort 80
-            ViaProxyName "LeaflowProxy"
-            # 使用远程 SOCKS5
-            # tinyproxy 本身不直接支持 SOCKS5，需要 socat 或 tsocks 透传
-            EOF
+cat <<EOF > $CONF_FILE
+Port $LOCAL_PORT
+Listen 127.0.0.1
+Timeout 600
+DefaultErrorFile "/usr/share/tinyproxy/default.html"
+StatFile "/usr/share/tinyproxy/stats.html"
+MaxClients 100
+MinSpareServers 5
+MaxSpareServers 20
+StartServers 10
+LogFile "/tmp/leaflow_proxies/tinyproxy_$LOCAL_PORT.log"
+LogLevel Info
+Allow 127.0.0.1
+ConnectPort 443
+ConnectPort 80
+ViaProxyName "LeaflowProxy"
+EOF
 
             # 启动 tinyproxy
             nohup tinyproxy -c $CONF_FILE &
