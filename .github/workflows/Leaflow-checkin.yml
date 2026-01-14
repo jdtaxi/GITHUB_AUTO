@@ -16,7 +16,7 @@ jobs:
 
     env:
       TZ: Asia/Shanghai
-      SOCKS5_INFO: ${{ secrets.SOCKS5_INFO }}  # 格式: u1:p1@ip1:port1,u2:p2@ip2:port2,...
+      SOCKS5_INFO: ${{ secrets.SOCKS5_INFO }}
 
     steps:
       - name: 📥 Checkout repository
@@ -30,14 +30,24 @@ jobs:
       - name: 📦 Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git build-essential libnss3 libatk1.0-0 libatk-bridge2.0-0 \
-          libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libgbm1 libasound2 \
-          curl unzip || true
+          sudo apt-get install -y \
+            git build-essential \
+            libnss3 \
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libcups2 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libgbm1 \
+            libasound2 || true
 
       # ===============================
-      # 下载并编译 3proxy
+      # 3proxy：源码编译（关键步骤）
       # ===============================
-      - name: 🧩 Build 3proxy
+      - name: 🧩 Build & Install 3proxy
         run: |
           git clone https://github.com/3proxy/3proxy.git
           cd 3proxy
@@ -46,22 +56,24 @@ jobs:
           3proxy --version || true
 
       # ===============================
-      # 生成 3proxy 客户端配置并启动
+      # 启动本地 SOCKS5 转发（远程带密码）
       # ===============================
       - name: 🚀 Start local SOCKS5 proxies
         run: |
           mkdir -p /tmp/3proxy
           CONF=/tmp/3proxy/3proxy.cfg
           echo "daemon" > $CONF
-          echo "maxconn 100" >> $CONF
+          echo "maxconn 1000" >> $CONF
           echo "nserver 8.8.8.8" >> $CONF
           echo "nscache 65536" >> $CONF
           echo "timeouts 1 5 30 60 180 1800 15 60" >> $CONF
           echo "log /tmp/3proxy/3proxy.log D" >> $CONF
-          echo "auth strong" >> $CONF
+          echo "auth none" >> $CONF   # 本地不需要认证
 
-          PORT=1081
+          # 读取 SOCKS5_INFO 并映射本地端口
           IFS=',' read -ra PROXIES <<< "$SOCKS5_INFO"
+          PORT=1081
+
           for p in "${PROXIES[@]}"; do
             USERPASS=${p%@*}
             HOSTPORT=${p#*@}
@@ -70,14 +82,14 @@ jobs:
             HOST=${HOSTPORT%%:*}
             RPORT=${HOSTPORT#*:}
 
-            # 配置客户端模式转发到远程 SOCKS5
-            echo "socks -p$PORT -i127.0.0.1 -e$HOST -a -u $USER:$PASS" >> $CONF
-            echo "✅ 映射远程 $USER:$PASS@$HOST:$RPORT → 127.0.0.1:$PORT"
+            echo "socks -p$PORT -i127.0.0.1 -parent $HOST:$RPORT $USER $PASS" >> $CONF
+            echo "✅ 映射 $HOST:$RPORT → 127.0.0.1:$PORT"
             PORT=$((PORT+1))
           done
 
-          sudo 3proxy $CONF &
-          sleep 3
+          # 启动 3proxy
+          sudo 3proxy $CONF
+          sleep 2
 
       - name: 🔍 Verify local proxy ports
         run: |
