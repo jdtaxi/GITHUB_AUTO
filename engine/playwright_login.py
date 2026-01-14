@@ -1,7 +1,7 @@
 # engine/playwright_login.py
 import time
 from playwright.sync_api import sync_playwright
-from main import check_socks5_proxy
+
 LOGIN_URL = "https://leaflow.net/login"
 DASHBOARD_URL = "https://leaflow.net/dashboard"
 
@@ -10,7 +10,7 @@ DASHBOARD_URL = "https://leaflow.net/dashboard"
 # Playwright 浏览器启动（自动 fallback）
 # ==================================================
 
-def open_browser(proxy: dict = None, headless=True):
+def open_browser(proxy= None):
     """
     启动 Playwright 浏览器
     - SOCKS5 可用 → 使用代理
@@ -20,21 +20,15 @@ def open_browser(proxy: dict = None, headless=True):
     pw = sync_playwright().start()
 
     launch_args = {
-        "headless": headless,
+        "headless": True,
         "args": ["--no-sandbox", "--disable-dev-shm-usage"],
     }
 
     # ---------- SOCKS5 检测 ----------
-    if proxy and proxy.get("type") == "socks5":
-        ok, ip ,socks5_url= check_socks5_proxy(proxy)
-        if ok:
-            print(f"🧦 使用 SOCKS5 代理，出口 IP = {ip}")
-            launch_args["proxy"] = {
-                "server": socks5_url
-            }
-        else:
-            print("❌ SOCKS5 不可用，已切换为直连")
-
+    if proxy :
+        launch_args["proxy"] = {
+            "server": proxy
+        }
     browser = pw.chromium.launch(**launch_args)
     ctx = browser.new_context()
     page = ctx.new_page()
