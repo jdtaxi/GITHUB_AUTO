@@ -133,7 +133,7 @@ class SecretUpdater:
 # Session 工厂
 # ==================================================
 
-def session_from_cookies(cookies, headers=None):
+def session_from_cookies(cookies, headers=None, proxy=None):
     print("🧩 [Session] 开始从 cookies 构建 session")
 
     session = requests.Session()
@@ -179,6 +179,33 @@ def session_from_cookies(cookies, headers=None):
         session.headers.update(headers)
         print("📎 [Session] 已合并自定义 headers")
 
+    # ---------- 代理设置 ----------
+    if proxy:
+        try:
+            if isinstance(proxy, dict):
+                # JSON 格式
+                proxy_type = proxy.get("type", "socks5")
+                server = proxy["server"]
+                port = proxy["port"]
+                username = proxy.get("username")
+                password = proxy.get("password")
+                if username and password:
+                    proxy_url = f"{proxy_type}://{username}:{password}@{server}:{port}"
+                else:
+                    proxy_url = f"{proxy_type}://{server}:{port}"
+            elif isinstance(proxy, str):
+                proxy_url = proxy
+            else:
+                raise ValueError("不支持的 proxy 格式")
+
+            session.proxies.update({
+                "http": proxy_url,
+                "https": proxy_url,
+            })
+            print(f"🌐 已设置代理: {proxy_url}")
+        except Exception as e:
+            print(f"⚠ 设置代理失败: {e}")
+            
     print("✅ [Session] Session 构建完成")
     return session
 
@@ -194,39 +221,34 @@ def perform_token_checkin(
     checkin_url: str = None,
     main_site: str = None,
     headers=None,
+    proxy=None,  # 新增 proxy 参数
 ):
     print("=" * 60)
     print(f"🚀 [{account_name}] perform_token_checkin 入口")
 
-    # ---------- 参数完整性检查 ----------
+    # 参数检查
     missing = []
-
-    if not cookies:
-        missing.append("cookies")
-    if not account_name:
-        missing.append("account_name")
-    if not checkin_url:
-        missing.append("checkin_url")
-    if not main_site:
-        missing.append("main_site")
-
+    if not cookies: missing.append("cookies")
+    if not account_name: missing.append("account_name")
+    if not checkin_url: missing.append("checkin_url")
+    if not main_site: missing.append("main_site")
     if missing:
-        print("❗❗❗ 参数不完整警告 ❗❗❗")
         print(f"❌ 缺失参数: {', '.join(missing)}")
-        print("⚠ 本次签到流程已跳过（不会发送任何请求）")
+        print("⚠ 本次签到跳过")
         print("=" * 60)
         return False, f"参数不完整: {', '.join(missing)}"
 
-    # ---------- 参数打印 ----------
     print(f"👤 account_name = {account_name}")
     print(f"🔗 checkin_url  = {checkin_url}")
     print(f"🏠 main_site   = {main_site}")
     print(f"🍪 cookies 数量 = {len(cookies)}")
+    if proxy:
+        print(f"🌐 使用代理 = {proxy}")
 
-    # ---------- 构建 Session ----------
-    session = session_from_cookies(cookies, headers=headers)
+    # 构建 session
+    session = session_from_cookies(cookies, headers=headers, proxy=proxy)
 
-    # ---------- 执行签到 ----------
+    # 执行签到
     result = perform_checkin(
         session=session,
         account_name=account_name,
@@ -236,6 +258,7 @@ def perform_token_checkin(
 
     print(f"🏁 [{account_name}] perform_token_checkin 结束 -> {result}")
     return result
+
 
 
 # ==================================================
