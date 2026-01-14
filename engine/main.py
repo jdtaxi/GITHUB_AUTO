@@ -50,7 +50,7 @@ def build_socks5_url(proxy: dict) -> str:
     pwd = proxy.get("password")
 
     if user and pwd:
-        return f"socks5://{user}:{pwd}@{host}:{port}"
+        return f"socks://{user}:{pwd}@{host}:{port}"
     return f"socks5://{host}:{port}"
 
 
