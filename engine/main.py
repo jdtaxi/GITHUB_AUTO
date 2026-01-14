@@ -13,6 +13,50 @@ REPO = os.getenv("GITHUB_REPOSITORY")
 REPO_TOKEN = os.getenv("REPO_TOKEN")
 
 # ==================================================
+# SOCKS5 工具函数
+# ==================================================
+
+def build_socks5_url(proxy: dict) -> str:
+    """
+    将 socks5 dict 转换为 socks5:// URL
+    """
+    host = proxy["server"]
+    port = proxy["port"]
+    user = proxy.get("username")
+    pwd = proxy.get("password")
+
+    if user and pwd:
+        return f"socks5://{user}:{pwd}@{host}:{port}"
+    return f"socks5://{host}:{port}"
+
+
+def check_socks5_proxy(proxy: dict, timeout=8):
+    """
+    检测 SOCKS5 是否可用
+    返回 (True, ip) 或 (False, None)
+    """
+    socks5_url = build_socks5_url(proxy)
+
+    proxies = {
+        "http": socks5_url,
+        "https": socks5_url,
+    }
+
+    try:
+        r = requests.get(
+            "https://api.ipify.org",
+            proxies=proxies,
+            timeout=timeout,
+        )
+        if r.status_code == 200:
+            return True, r.text.strip()
+    except Exception as e:
+        print(f"⚠️ SOCKS5 检测失败: {e}")
+
+    return False, None
+
+
+# ==================================================
 # 解密函数
 # ==================================================
 
