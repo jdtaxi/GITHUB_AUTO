@@ -42,10 +42,10 @@ jobs:
             libxdamage1 \
             libxfixes3 \
             libgbm1 \
-            libasound2 || true
+            libasound2 curl || true
 
       # ===============================
-      # 3proxy：源码编译
+      # 3proxy：源码编译（关键步骤）
       # ===============================
       - name: 🧩 Build & Install 3proxy
         run: |
@@ -63,24 +63,23 @@ jobs:
           mkdir -p /tmp/3proxy
           CONF=/tmp/3proxy/3proxy.cfg
           echo "daemon" > $CONF
+          echo "maxconn 100" >> $CONF
           echo "nserver 8.8.8.8" >> $CONF
           echo "nscache 65536" >> $CONF
-          echo "allow *" >> $CONF      # ✅ 放行规则
+          echo "timeouts 1 5 30 60 180 1800 15 60" >> $CONF
+          echo "log /tmp/3proxy/3proxy.log D" >> $CONF
+          echo "auth none" >> $CONF   # ❌ 关闭认证，先保证连通性
 
           PORT=1081
           IFS=',' read -ra PROXIES <<< "$SOCKS5_INFO"
+
           for p in "${PROXIES[@]}"; do
             USERPASS=${p%@*}
             HOSTPORT=${p#*@}
-            USER=${USERPASS%%:*}
-            PASS=${USERPASS#*:}
             HOST=${HOSTPORT%%:*}
             RPORT=${HOSTPORT#*:}
 
-            echo "auth strong" >> $CONF
-            echo "users $USER:CL:$PASS" >> $CONF
-            echo "socks -p$PORT -i127.0.0.1 -e$HOST" >> $CONF
-
+            echo "socks -p$PORT -i127.0.0.1 -e127.0.0.1" >> $CONF
             echo "✅ 映射 $HOST:$RPORT → 127.0.0.1:$PORT"
             PORT=$((PORT+1))
           done
@@ -91,6 +90,7 @@ jobs:
       - name: 🔍 Verify local proxy ports
         run: |
           ss -lntp | grep 108 || true
+          curl -x socks5h://127.0.0.1:1081 https://api.ipify.org || true
 
       - name: 📦 Install Python dependencies
         run: |
@@ -106,7 +106,6 @@ jobs:
           TG_BOT_TOKEN:     ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID:       ${{ secrets.TG_CHAT_ID }}
           CONFIG_PASSWORD: ${{ secrets.CONFIG_PASSWORD }}
-          LOCAL_PROXY_BASE: 1081   # Playwright & requests 代理本地端口起点
         run: |
           python -u leaflow/Leaflow_checkin.py
 
