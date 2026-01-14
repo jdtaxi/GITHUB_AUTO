@@ -1,4 +1,4 @@
-name: Leaflow 自动登录签到
+name: Leaflow 自动登录签到 
 
 on:
   workflow_dispatch:
@@ -41,6 +41,63 @@ jobs:
             libxfixes3 \
             libgbm1 \
             libasound2 || true
+
+      # ===========================
+      # ✅ 新增：安装 3proxy
+      # ===========================
+      - name: 🧩 Install 3proxy
+        run: sudo apt-get install -y 3proxy
+
+      # ===========================
+      # ✅ 新增：从 SOCKS5_INFO 生成多端口本地 SOCKS
+      # ===========================
+      - name: 🧩 Setup SOCKS5 forwarders
+        env:
+          SOCKS5_INFO: ${{ secrets.SOCKS5_INFO }}
+        run: |
+          python << 'EOF'
+          import os
+
+          raw = os.environ.get("SOCKS5_INFO", "").strip()
+          if not raw:
+              raise SystemExit("❌ SOCKS5_INFO 未设置")
+
+          socks_list = [x.strip() for x in raw.split(",") if x.strip()]
+          base_port = 1081
+
+          lines = [
+              "daemon",
+              "maxconn 500",
+              "nserver 8.8.8.8",
+              "nserver 1.1.1.1",
+              "timeouts 1 5 30 60 180 1800 15 60",
+          ]
+
+          for i, s in enumerate(socks_list):
+              up, hp = s.split("@", 1)
+              user, pwd = up.split(":", 1)
+              host, port = hp.split(":", 1)
+
+              local_port = base_port + i
+              lines.append(f"socks -p{local_port}")
+              lines.append(
+                  f"parent 1000 socks5 {host} {port} {user} {pwd}"
+              )
+
+              print(f"✔ SOCKS {host}:{port} → 127.0.0.1:{local_port}")
+
+          with open("3proxy.cfg", "w") as f:
+              f.write("\n".join(lines))
+          EOF
+
+      # ===========================
+      # ✅ 新增：启动 3proxy
+      # ===========================
+      - name: 🚀 Start 3proxy
+        run: |
+          3proxy 3proxy.cfg
+          sleep 2
+          ss -lntp | grep 108 || true
 
       - name: 📦 Install Python dependencies
         run: |
