@@ -86,6 +86,7 @@ def process_account(email, password, cookies_map,proxy= None):
      # 二次确认浏览器出口 IP
     page.goto("https://api.ipify.org")
     print("🌍 浏览器出口 IP:", page.text_content("body"))
+    return
     try:
         # ---------- cookies 尝试 ----------
         if email in cookies_map:
