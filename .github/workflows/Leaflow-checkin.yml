@@ -36,8 +36,6 @@ jobs:
             libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
             libxfixes3 libgbm1 libasound2 || true
 
-
-
       # ===============================
       # 启动本地 SOCKS5 映射（每个账号独立端口）
       # ===============================
@@ -59,7 +57,7 @@ jobs:
             echo "✅ 映射 $HOST:$RPORT → 127.0.0.1:$LOCAL_PORT"
 
             # 使用 socat 映射 SOCKS5 → 本地 TCP 端口
-            nohup socat TCP-LISTEN:$LOCAL_PORT,fork SOCKS5:$HOST:0,socksuser=$USER,sockspass=$PASS &
+            nohup socat TCP-LISTEN:$LOCAL_PORT,fork SOCKS5:$HOST:$RPORT,socksuser=$USER,sockspass=$PASS &
           done
           sleep 3
 
