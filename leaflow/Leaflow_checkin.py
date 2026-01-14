@@ -45,6 +45,7 @@ headers={
     "Connection": "keep-alive",
     "Upgrade-Insecure-Requests": "1"
 }
+
 # ================= 账号 / Cookies =================
 
 def load_accounts():
@@ -78,22 +79,23 @@ def load_cookies():
 
 # ================= 单账号流程 =================
 
-async def process_account(email, password, cookies_map,proxy= None):
+async def process_account(email, password, cookies_map, proxy=None):
     print("=" * 60)
-    print(f"👤 处理账号: {email}")
+    print(f"👤 开始处理账号: {email}")
 
     pw, browser, ctx, page = await open_browser(proxy)
     note = ""
-     # 二次确认浏览器出口 IP
-    page.goto("https://api.ipify.org")
-    print("🌍 浏览器出口 IP:", page.text_content("body"))
-    return
+
     try:
+        # ---------- 浏览器出口 IP ----------
+        page.goto("https://api.ipify.org")
+        ip = page.text_content("body")
+        print(f"🌍 浏览器出口 IP: {ip}")
+
         # ---------- cookies 尝试 ----------
         if email in cookies_map:
             print("🍪 尝试复用 cookies")
             ctx.add_cookies(cookies_map[email])
-
             if cookies_ok(page):
                 print("✅ cookies 有效")
                 note = "cookies复用"
@@ -101,11 +103,11 @@ async def process_account(email, password, cookies_map,proxy= None):
                 print("♻ cookies 已失效")
                 raise RuntimeError("cookies expired")
         else:
+            print("⚠ 未找到 cookies，执行登录")
             raise RuntimeError("no cookies")
 
-    except Exception:
-        # ---------- 登录 ----------
-        print("🔐 执行 Playwright 登录")
+    except Exception as e:
+        print(f"🔐 执行 Playwright 登录: {e}")
         cookies = login_and_get_cookies(page, email, password)
         cookies_map[email] = cookies
         note = "重新登录"
@@ -115,71 +117,79 @@ async def process_account(email, password, cookies_map,proxy= None):
         cookies_map[email] = ctx.cookies()
         browser.close()
         pw.stop()
+        print("💾 cookies 已同步，浏览器已关闭")
 
     # ---------- API 签到 ----------
     print("📡 执行 API 签到")
-    ok, msg = perform_token_checkin(cookies_map[email], email, checkin_url, main_site,headers,proxy= None)
-    print(f"ℹ️ API 签到: {ok},{msg}")
+    try:
+        ok, msg = perform_token_checkin(cookies_map[email], email, checkin_url, main_site, headers, proxy=None)
+        print(f"ℹ️ API 签到结果: {ok}, {msg}")
+    except Exception as e:
+        ok, msg = False, f"签到失败: {e}"
+        print(f"❌ API 签到异常: {e}")
+
     return ok, f"{note} | {msg}"
 
 
 # ================= Main =================
 
 async def main():
-    useproxy=True
+    useproxy = True
     password = os.getenv("CONFIG_PASSWORD","").strip()
     if not password:
         raise RuntimeError("❌ 未设置 CONFIG_PASSWORD")
     config = getconfig(password)
 
+    proxy = ""
     if useproxy:
-        proxy= config.get("proxy","")
-    if proxy:
-        proxy= proxy.get("value","")
-        
-    LF_INFO= config.get("LF_INFO","")
-    
+        proxy_cfg = config.get("proxy","")
+        if proxy_cfg:
+            proxy = proxy_cfg.get("value","")
+
+    LF_INFO = config.get("LF_INFO","")
     if not LF_INFO:
         raise RuntimeError("❌ 配置文件中不存在 LF_INFO")
-    ##accounts = load_accounts()
     print(f'ℹ️ 已读取: {LF_INFO.get("description","")}')
-    
+
     accounts = LF_INFO.get("value","")
     cookies_map = load_cookies()
     results = []
 
     for idx, acc in enumerate(accounts):
-        usename = acc.get("usename")
+        username = acc.get("usename")
         password = acc.get("password")
     
-        if not usename or not password:
-            print("⚠ 跳过非法账号{idx+1}:", acc)
+        if not username or not password:
+            print(f"⚠ 跳过非法账号 {idx+1}: {acc}")
             continue
-        print(f'----------【{idx+1}】{usename}----------')
+        print(f'----------【{idx+1}】{username}----------')
 
+        # ---------- 代理测试 ----------
+        proxyurl = None
         try:
-            ok, msg ,proxyurl= check_socks5_proxy(proxy[idx])
-            results.append(f"{'✅' if ok else '❌'} {usename} 测试代理— {msg}")
+            ok, msg, proxyurl = check_socks5_proxy(proxy[idx])
+            print(f"{'✅' if ok else '❌'} {username} 测试代理: {msg}")
+            results.append(f"{'✅' if ok else '❌'} {username} 测试代理— {msg}")
         except Exception as e:
-            results.append(f"❌ {usename} — {e}")
+            print(f"❌ {username} 代理测试异常: {e}")
+            results.append(f"❌ {username} — {e}")
 
-
+        # ---------- 执行账号签到 ----------
         try:
-            ok, msg = await process_account(usename, password, cookies_map,proxyurl)
-            results.append(f"{'✅' if ok else '❌'} {usename} — {msg}")
+            ok, msg = await process_account(username, password, cookies_map, proxyurl)
+            results.append(f"{'✅' if ok else '❌'} {username} — {msg}")
         except Exception as e:
-            results.append(f"❌ {usename} — {e}")
+            print(f"❌ {username} 签到异常: {e}")
+            results.append(f"❌ {username} — {e}")
 
     # ---------- 回写 cookies ----------
-    SecretUpdater("LEAFLOW_COOKIES").update(
-        json.dumps(cookies_map, ensure_ascii=False)
-    )
+    print("💾 回写 cookies")
+    SecretUpdater("LEAFLOW_COOKIES").update(json.dumps(cookies_map, ensure_ascii=False))
 
     # ---------- 通知 ----------
-    send_notify(
-        title="Leaflow 自动签到汇总",
-        content="\n".join(results)
-    )
+    print("📨 发送签到汇总通知")
+    send_notify(title="Leaflow 自动签到汇总", content="\n".join(results))
+    print("✅ 全部完成")
 
 
 if __name__ == "__main__":
