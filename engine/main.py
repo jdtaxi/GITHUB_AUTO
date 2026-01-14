@@ -49,6 +49,7 @@ def check_socks5_proxy(proxy: dict, timeout=8):
             timeout=timeout,
         )
         if r.status_code == 200:
+            print(f"✅ SOCKS5 检测: {r.text.strip()}")
             return True, r.text.strip(),socks5_url
     except Exception as e:
         print(f"⚠️ SOCKS5 检测失败: {e}")
