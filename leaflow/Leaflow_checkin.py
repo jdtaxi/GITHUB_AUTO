@@ -91,6 +91,7 @@ async def process_account(email, password, cookies_map, proxy=None):
         await page.goto("https://api.ipify.org")
         ip = await page.text_content("body")
         print(f"🌍 浏览器出口 IP: {ip}")
+        return
 
         # ---------- cookies 尝试 ----------
         if email in cookies_map:
