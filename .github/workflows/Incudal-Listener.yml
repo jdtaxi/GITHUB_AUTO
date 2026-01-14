@@ -33,16 +33,16 @@ jobs:
           TG12965303: ${{ secrets.TG12965303 }}
 
           # 群聊信息
-          GROUP: "@incudal_com"
+          GROUP: ${{ secrets.GROUP }}
 
           # 目标成员 ID
-          TARGET_IDS: "3435357437,1966630851"
+          TARGET_IDS: ${{ secrets.TARGET_IDS }}
 
           # 监听时间（秒）
           LISTEN_SECONDS: 21600
 
           # 指定要使用的 TG 账号
-          USE_API_ID: "11027029"
+          USE_API_ID: ${{ secrets.USE_API_ID }}
 
           # Incudal 用户 session
           USER_SESSION: ${{ secrets.USER_SESSION }}
@@ -118,6 +118,11 @@ jobs:
                       except Exception as e:
                           print(f"执行 redeem.py 失败: {e}", flush=True)
                           RESULTS.append(f"用户 {sender.username}({sender_id}) 执行失败：{e}")
+                  else:
+                    print(f"未获取到codes！", flush=True)
+              else:
+                print(f"{sender_id}非目标用户！", flush=True)
+                          
 
           async def send_summary():
               text = "📊 TG 消息触发兑换结果\n\n" + "\n\n".join(RESULTS) if RESULTS else "📊 没有触发任何兑换"
@@ -183,14 +188,19 @@ jobs:
               except:
                   return {}
 
-          def decode(code_type, value):
-              return {
-                  "c": "CPU",
-                  "m": "内存",
-                  "d": "硬盘",
-                  "t": "流量",
-                  "h": "盲盒"
-              }.get(code_type, code_type) + f" +{value}"
+          def decode_redeem(code_type, code_value):
+            type_map = {
+                "c": {"name": "CPU", "unit": "%"},
+                "r": {"name": "内存", "unit": "MB"},
+                "d": {"name": "硬盘", "unit": "MB"},
+                "t": {"name": "流量", "unit": "GB"}
+            }
+        
+            info = type_map.get(code_type)
+            if not info:
+                return "未知资源"
+        
+            return f"{info['name']} +{code_value}{info['unit']}"
 
           def get_instances(session):
               try:
