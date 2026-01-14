@@ -82,7 +82,9 @@ def process_account(email, password, cookies_map,proxy= None):
 
     pw, browser, ctx, page = open_browser(proxy)
     note = ""
-
+     # 二次确认浏览器出口 IP
+    page.goto("https://api.ipify.org")
+    print("🌍 浏览器出口 IP:", page.text_content("body"))
     try:
         # ---------- cookies 尝试 ----------
         if email in cookies_map:
@@ -151,7 +153,7 @@ def main():
             print("⚠ 跳过非法账号{idx+1}:", acc)
             continue
         print(f'----------【{idx+1}】{usename}----------')
-        return
+ 
         try:
             ok, msg = process_account(usename, password, cookies_map,proxy[idx])
             results.append(f"{'✅' if ok else '❌'} {usename} — {msg}")
