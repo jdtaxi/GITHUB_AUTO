@@ -54,12 +54,12 @@ def build_socks5_url(proxy: dict) -> str:
     return f"socks5://{host}:{port}"
 
 
-def check_socks5_proxy(proxy: dict, timeout=8):
+def check_socks5_proxy(idx, timeout=8):
     """
     检测 SOCKS5 是否可用
     返回 (True, ip) 或 (False, None)
     """
-    socks5_url = build_socks5_url(proxy)
+    socks5_url = f"socks5://127.0.0.1:{1081 + idx}"##build_socks5_url(proxy)
 
     proxies = {
         "http": socks5_url,
