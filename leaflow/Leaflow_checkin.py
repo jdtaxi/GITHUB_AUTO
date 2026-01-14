@@ -26,7 +26,8 @@ from engine.playwright_login import (
 from engine.main import (
     perform_token_checkin,
     SecretUpdater,
-    getconfig
+    getconfig,
+    check_socks5_proxy
 )
 
 # ================= 基础配置 =================
@@ -153,9 +154,15 @@ def main():
             print("⚠ 跳过非法账号{idx+1}:", acc)
             continue
         print(f'----------【{idx+1}】{usename}----------')
- 
+
         try:
-            ok, msg = process_account(usename, password, cookies_map,proxy[idx])
+            ok, msg ,proxyurl= check_socks5_proxy(proxy[idx])
+            results.append(f"{'✅' if ok else '❌'} {usename} 测试代理— {msg}")
+        except Exception as e:
+            results.append(f"❌ {usename} — {e}")
+
+        try:
+            ok, msg = process_account(usename, password, cookies_map，proxyurl)
             results.append(f"{'✅' if ok else '❌'} {usename} — {msg}")
         except Exception as e:
             results.append(f"❌ {usename} — {e}")
