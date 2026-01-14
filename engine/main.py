@@ -15,7 +15,31 @@ REPO_TOKEN = os.getenv("REPO_TOKEN")
 # ==================================================
 # SOCKS5 工具函数
 # ==================================================
-
+def parse_socks5(proxy_str: str) -> dict:
+    """
+    将 socks5://username:password@host:port 转为
+    {
+        "server": "socks5://host:port",
+        "username": "username",
+        "password": "password"
+    }
+    """
+    if not proxy_str.startswith("socks5://"):
+        raise ValueError("必须是 socks5:// 开头")
+    
+    # 去掉前缀
+    tmp = proxy_str[len("socks5://"):]
+    
+    # username:password@host:port
+    user_pass, host_port = tmp.split("@")
+    username, password = user_pass.split(":")
+    
+    return {
+        "server": f"socks5://{host_port}",
+        "username": username,
+        "password": password
+    }
+    
 def build_socks5_url(proxy: dict) -> str:
     """
     将 socks5 dict 转换为 socks5:// URL
