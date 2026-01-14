@@ -45,7 +45,7 @@ jobs:
             libasound2 || true
 
       # ===============================
-      # 3proxy：源码编译（关键步骤）
+      # 3proxy：源码编译
       # ===============================
       - name: 🧩 Build & Install 3proxy
         run: |
@@ -61,18 +61,14 @@ jobs:
       - name: 🚀 Start local SOCKS5 proxies
         run: |
           mkdir -p /tmp/3proxy
-          IFS=',' read -ra PROXIES <<< "$SOCKS5_INFO"
-
-          PORT=1081
           CONF=/tmp/3proxy/3proxy.cfg
           echo "daemon" > $CONF
           echo "nserver 8.8.8.8" >> $CONF
           echo "nscache 65536" >> $CONF
-          echo "allow *" >> $CONF      # ✅ 关键放行行
-          
+          echo "allow *" >> $CONF      # ✅ 放行规则
+
           PORT=1081
           IFS=',' read -ra PROXIES <<< "$SOCKS5_INFO"
-          
           for p in "${PROXIES[@]}"; do
             USERPASS=${p%@*}
             HOSTPORT=${p#*@}
@@ -80,15 +76,15 @@ jobs:
             PASS=${USERPASS#*:}
             HOST=${HOSTPORT%%:*}
             RPORT=${HOSTPORT#*:}
-          
+
             echo "auth strong" >> $CONF
             echo "users $USER:CL:$PASS" >> $CONF
             echo "socks -p$PORT -i127.0.0.1 -e$HOST" >> $CONF
-          
+
             echo "✅ 映射 $HOST:$RPORT → 127.0.0.1:$PORT"
             PORT=$((PORT+1))
           done
-          
+
           sudo 3proxy $CONF
           sleep 2
 
@@ -110,6 +106,7 @@ jobs:
           TG_BOT_TOKEN:     ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID:       ${{ secrets.TG_CHAT_ID }}
           CONFIG_PASSWORD: ${{ secrets.CONFIG_PASSWORD }}
+          LOCAL_PROXY_BASE: 1081   # Playwright & requests 代理本地端口起点
         run: |
           python -u leaflow/Leaflow_checkin.py
 
