@@ -161,6 +161,7 @@ def main():
         except Exception as e:
             results.append(f"❌ {usename} — {e}")
 
+        continue
         try:
             ok, msg = process_account(usename, password, cookies_map,proxyurl)
             results.append(f"{'✅' if ok else '❌'} {usename} — {msg}")
