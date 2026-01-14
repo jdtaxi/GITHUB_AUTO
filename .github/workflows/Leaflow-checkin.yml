@@ -45,7 +45,7 @@ jobs:
       - name: 📦 Install Python dependencies
         run: |
           pip install -U pip
-          pip install playwright requests pynacl
+          pip install playwright requests pynacl cryptography
           playwright install chromium
 
       - name: ▶️ Run Leaflow Checkin
