@@ -39,8 +39,7 @@ jobs:
             libxcomposite1 \
             libxdamage1 \
             libxfixes3 \
-            libgbm1 \
-            libasound2 || true
+            libgbm1 || true
 
       - name: 📦 Install Python dependencies
         run: |
