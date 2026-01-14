@@ -68,6 +68,7 @@ jobs:
           echo "daemon" > $CONF
           echo "nserver 8.8.8.8" >> $CONF
           echo "nscache 65536" >> $CONF
+          echo "allow *" >> $CONF   # ✅ 这一行是关键
 
           for p in "${PROXIES[@]}"; do
             USERPASS=${p%@*}
