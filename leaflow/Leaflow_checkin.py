@@ -25,7 +25,8 @@ from engine.playwright_login import (
 )
 from engine.main import (
     perform_token_checkin,
-    SecretUpdater
+    SecretUpdater,
+    getconfig
 )
 
 # ================= 基础配置 =================
