@@ -121,21 +121,32 @@ def process_account(email, password, cookies_map):
 # ================= Main =================
 
 def main():
-    password = os.getenv("CONFIG_PASSWORD")
+    useproxy=True
+    password = os.getenv("CONFIG_PASSWORD","").strip()
+    if not password:
+        raise RuntimeError("❌ 未设置 CONFIG_PASSWORD")
     config = getconfig(password)
-    print(config["GROUP"])
-    return
+
     
-    accounts = load_accounts()
+    LF_INFO= config.get("LF_INFO","")
+    
+    if not LF_INFO:
+        raise RuntimeError("❌ 配置文件中不存在 LF_INFO")
+    ##accounts = load_accounts()
+    print(f'ℹ️ 已读取: {LF_INFO.get("description","")}')
+    
+    accounts = LF_INFO.get("value","")
     cookies_map = load_cookies()
     results = []
 
-    for email, pwd in accounts.items():
+    for usename, password in accounts.items():
+        print(f'----------{usename}----------')
+        return
         try:
-            ok, msg = process_account(email, pwd, cookies_map)
-            results.append(f"{'✅' if ok else '❌'} {email} — {msg}")
+            ok, msg = process_account(usename, password, cookies_map)
+            results.append(f"{'✅' if ok else '❌'} {usename} — {msg}")
         except Exception as e:
-            results.append(f"❌ {email} — {e}")
+            results.append(f"❌ {usename} — {e}")
 
     # ---------- 回写 cookies ----------
     SecretUpdater("LEAFLOW_COOKIES").update(
