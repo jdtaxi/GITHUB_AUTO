@@ -36,6 +36,7 @@ jobs:
             libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
             libxfixes3 libgbm1 libasound2 || true
 
+
       # ===============================
       # 启动本地 SOCKS5 映射（每个账号独立端口）
       # ===============================
