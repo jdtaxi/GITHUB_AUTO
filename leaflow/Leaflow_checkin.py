@@ -88,15 +88,15 @@ async def process_account(email, password, cookies_map, proxy=None):
 
     try:
         # ---------- 浏览器出口 IP ----------
-        page.goto("https://api.ipify.org")
-        ip = page.text_content("body")
+        await page.goto("https://api.ipify.org")
+        ip = await page.text_content("body")
         print(f"🌍 浏览器出口 IP: {ip}")
 
         # ---------- cookies 尝试 ----------
         if email in cookies_map:
             print("🍪 尝试复用 cookies")
-            ctx.add_cookies(cookies_map[email])
-            if cookies_ok(page):
+            await ctx.add_cookies(cookies_map[email])       # ✅ await
+            if await cookies_ok(page):                       # ✅ await
                 print("✅ cookies 有效")
                 note = "cookies复用"
             else:
@@ -108,28 +108,28 @@ async def process_account(email, password, cookies_map, proxy=None):
 
     except Exception as e:
         print(f"🔐 执行 Playwright 登录: {e}")
-        cookies = login_and_get_cookies(page, email, password)
+        cookies = await login_and_get_cookies(page, email, password)   # ✅ await
         cookies_map[email] = cookies
         note = "重新登录"
 
     finally:
         # 同步 cookies
-        cookies_map[email] = ctx.cookies()
-        browser.close()
-        pw.stop()
+        cookies_map[email] = await ctx.cookies()     # ✅ await
+        await browser.close()                         # ✅ await
+        await pw.stop()                               # ✅ await
         print("💾 cookies 已同步，浏览器已关闭")
 
     # ---------- API 签到 ----------
     print("📡 执行 API 签到")
     try:
-        ok, msg = perform_token_checkin(cookies_map[email], email, checkin_url, main_site, headers, proxy=None)
+        # 如果 perform_token_checkin 本身是 async，记得 await
+        ok, msg = await perform_token_checkin(cookies_map[email], email, checkin_url, main_site, headers, proxy=None)
         print(f"ℹ️ API 签到结果: {ok}, {msg}")
     except Exception as e:
         ok, msg = False, f"签到失败: {e}"
         print(f"❌ API 签到异常: {e}")
 
     return ok, f"{note} | {msg}"
-
 
 # ================= Main =================
 
