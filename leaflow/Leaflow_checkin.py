@@ -5,6 +5,7 @@
 Leaflow Playwright + API 自动签到
 依赖 engine 目录中的模块
 """
+import asyncio
 import os
 import sys
 import json
@@ -77,11 +78,11 @@ def load_cookies():
 
 # ================= 单账号流程 =================
 
-def process_account(email, password, cookies_map,proxy= None):
+async def process_account(email, password, cookies_map,proxy= None):
     print("=" * 60)
     print(f"👤 处理账号: {email}")
 
-    pw, browser, ctx, page = open_browser(proxy)
+    pw, browser, ctx, page = await open_browser(proxy)
     note = ""
      # 二次确认浏览器出口 IP
     page.goto("https://api.ipify.org")
@@ -124,7 +125,7 @@ def process_account(email, password, cookies_map,proxy= None):
 
 # ================= Main =================
 
-def main():
+async def main():
     useproxy=True
     password = os.getenv("CONFIG_PASSWORD","").strip()
     if not password:
@@ -164,7 +165,7 @@ def main():
 
         continue
         try:
-            ok, msg = process_account(usename, password, cookies_map,proxyurl)
+            ok, msg = await process_account(usename, password, cookies_map,proxyurl)
             results.append(f"{'✅' if ok else '❌'} {usename} — {msg}")
         except Exception as e:
             results.append(f"❌ {usename} — {e}")
@@ -182,4 +183,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
