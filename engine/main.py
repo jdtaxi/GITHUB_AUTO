@@ -56,25 +56,18 @@ def build_socks5_url(proxy: dict) -> str:
 
 def check_socks5_proxy(idx, timeout=8):
     """
-    检测 SOCKS5 是否可用
-    返回 (True, ip) 或 (False, None)
+    检测本地 SOCKS5 是否可用
+    返回 (True, ip, proxy_url) 或 (False, None, None)
     """
-    socks5_url = f"socks5://127.0.0.1:{1081 + idx}"##build_socks5_url(proxy)
+    socks5_url = f"socks5://127.0.0.1:{1081 + idx}"
     print(f"🌐  检测SOCKS5: {socks5_url}")
-    proxies = {
-        "http": socks5_url,
-        "https": socks5_url,
-    }
+    proxies = {"http": socks5_url, "https": socks5_url}
 
     try:
-        r = requests.get(
-            "https://api.ipify.org",
-            proxies=proxies,
-            timeout=timeout,
-        )
+        r = requests.get("https://api.ipify.org", proxies=proxies, timeout=timeout)
         if r.status_code == 200:
             print(f"✅ SOCKS5 检测: {r.text.strip()}")
-            return True, r.text.strip(),socks5_url
+            return True, r.text.strip(), socks5_url
     except Exception as e:
         print(f"⚠️ SOCKS5 检测失败: {e}")
 
