@@ -4,142 +4,10 @@ import os
 import base64
 import requests
 from nacl import public, encoding
-import json
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from hashlib import sha256
-from pathlib import Path
 
 REPO = os.getenv("GITHUB_REPOSITORY")
 REPO_TOKEN = os.getenv("REPO_TOKEN")
 
-# ==================================================
-# SOCKS5 工具函数
-# ==================================================
-def parse_socks5(proxy_str: str) -> dict:
-    """
-    将 socks5://username:password@host:port 转为
-    {
-        "server": "socks5://host:port",
-        "username": "username",
-        "password": "password"
-    }
-    """
-    if not proxy_str.startswith("socks5://"):
-        raise ValueError("必须是 socks5:// 开头")
-    
-    # 去掉前缀
-    tmp = proxy_str[len("socks5://"):]
-    
-    # username:password@host:port
-    user_pass, host_port = tmp.split("@")
-    username, password = user_pass.split(":")
-    
-    return {
-        "server": f"socks5://{host_port}",
-        "username": username,
-        "password": password
-    }
-    
-def build_socks5_url(proxy: dict) -> str:
-    """
-    将 socks5 dict 转换为 socks5:// URL
-    """
-    host = proxy["server"]
-    port = proxy["port"]
-    user = proxy.get("username")
-    pwd = proxy.get("password")
-
-    if user and pwd:
-        return f"socks5://{user}:{pwd}@{host}:{port}"
-    return f"socks5://{host}:{port}"
-
-
-def check_socks5_proxy(idx, timeout=8):
-    """
-    检测本地 SOCKS5 是否可用
-    返回 (True, ip, proxy_url) 或 (False, None, None)
-    """
-    socks5_url = f"socks5://127.0.0.1:{1081 + idx}"
-    print(f"🌐  检测SOCKS5: {socks5_url}")
-    proxies = {"http": socks5_url, "https": socks5_url}
-
-    try:
-        r = requests.get("https://api.ipify.org", proxies=proxies, timeout=timeout)
-        if r.status_code == 200:
-            print(f"✅ SOCKS5 检测: {r.text.strip()}")
-            return True, r.text.strip(), socks5_url
-    except Exception as e:
-        print(f"⚠️ SOCKS5 检测失败: {e}")
-
-    return False, None, None
-
-
-# ==================================================
-# 解密函数
-# ==================================================
-
-def derive_key(password: str) -> bytes:
-    """
-    从密码字符串派生 32 字节 AES key
-    """
-    return sha256(password.encode()).digest()
-
-
-def decrypt_json(encrypted_str: str, password: str) -> dict:
-    """
-    解密 AES-GCM base64 编码的 JSON 字符串
-
-    参数:
-        encrypted_str: 加密后的 base64 字符串
-        password: 加密时使用的密码
-
-    返回:
-        解密后的 JSON 数据（dict）
-
-    异常:
-        ValueError: 解密失败或内容非 JSON
-    """
-    try:
-        key = derive_key(password)
-        raw = base64.b64decode(encrypted_str)
-
-        if len(raw) < 13:  # nonce 12 字节 + 至少 1 字节密文
-            raise ValueError("加密数据格式错误")
-
-        nonce = raw[:12]
-        ciphertext = raw[12:]
-
-        aesgcm = AESGCM(key)
-        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
-
-        return json.loads(plaintext.decode("utf-8"))
-
-    except Exception as e:
-        raise ValueError(f"解密失败: {e}")
-        
-def getconfig(password: str) -> dict:
-    """
-    从脚本上一级目录读取 config.enc 并解密
-    """
-    # 当前脚本所在目录
-    current_dir = Path(__file__).resolve().parent
-    # 上一级目录
-    parent_dir = current_dir.parent
-    # config.enc 路径
-    config_path = parent_dir / "config.enc"
-
-    if not config_path.exists():
-        raise FileNotFoundError(f"❌ 找不到 config.enc: {config_path}")
-
-    encrypted_content = config_path.read_text(encoding="utf-8").strip()
-
-    try:
-        data = decrypt_json(encrypted_content, password)
-        print("✅ 解密成功")
-        return data
-    except ValueError as e:
-        print("❌ 解密失败:", e)
-        raise
 # ==================================================
 # GitHub Secret 回写
 # ==================================================
@@ -195,7 +63,7 @@ class SecretUpdater:
 # Session 工厂
 # ==================================================
 
-def session_from_cookies(cookies, headers=None, proxy=None):
+def session_from_cookies(cookies, headers=None):
     print("🧩 [Session] 开始从 cookies 构建 session")
 
     session = requests.Session()
@@ -241,18 +109,6 @@ def session_from_cookies(cookies, headers=None, proxy=None):
         session.headers.update(headers)
         print("📎 [Session] 已合并自定义 headers")
 
-    # ---------- 代理设置 ----------
-    if proxy:
-        try:
-  
-            session.proxies.update({
-                "http": proxy,
-                "https": proxy,
-            })
-            print(f"🌐 已设置代理: {proxy_url}")
-        except Exception as e:
-            print(f"⚠ 设置代理失败: {e}")
-            
     print("✅ [Session] Session 构建完成")
     return session
 
@@ -268,34 +124,39 @@ def perform_token_checkin(
     checkin_url: str = None,
     main_site: str = None,
     headers=None,
-    proxy=None,  # 新增 proxy 参数
 ):
     print("=" * 60)
     print(f"🚀 [{account_name}] perform_token_checkin 入口")
 
-    # 参数检查
+    # ---------- 参数完整性检查 ----------
     missing = []
-    if not cookies: missing.append("cookies")
-    if not account_name: missing.append("account_name")
-    if not checkin_url: missing.append("checkin_url")
-    if not main_site: missing.append("main_site")
+
+    if not cookies:
+        missing.append("cookies")
+    if not account_name:
+        missing.append("account_name")
+    if not checkin_url:
+        missing.append("checkin_url")
+    if not main_site:
+        missing.append("main_site")
+
     if missing:
+        print("❗❗❗ 参数不完整警告 ❗❗❗")
         print(f"❌ 缺失参数: {', '.join(missing)}")
-        print("⚠ 本次签到跳过")
+        print("⚠ 本次签到流程已跳过（不会发送任何请求）")
         print("=" * 60)
         return False, f"参数不完整: {', '.join(missing)}"
 
+    # ---------- 参数打印 ----------
     print(f"👤 account_name = {account_name}")
     print(f"🔗 checkin_url  = {checkin_url}")
     print(f"🏠 main_site   = {main_site}")
     print(f"🍪 cookies 数量 = {len(cookies)}")
-    if proxy:
-        print(f"🌐 使用代理 = {proxy}")
 
-    # 构建 session
-    session = session_from_cookies(cookies, headers=headers, proxy=proxy)
+    # ---------- 构建 Session ----------
+    session = session_from_cookies(cookies, headers=headers)
 
-    # 执行签到
+    # ---------- 执行签到 ----------
     result = perform_checkin(
         session=session,
         account_name=account_name,
@@ -305,7 +166,6 @@ def perform_token_checkin(
 
     print(f"🏁 [{account_name}] perform_token_checkin 结束 -> {result}")
     return result
-
 
 
 # ==================================================
