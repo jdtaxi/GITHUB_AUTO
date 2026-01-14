@@ -55,6 +55,7 @@ jobs:
           REPO_TOKEN:       ${{ secrets.REPO_TOKEN }}
           TG_BOT_TOKEN:     ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID:       ${{ secrets.TG_CHAT_ID }}
+          CONFIG_PASSWORD: ${{ secrets.CONFIG_PASSWORD }}
         run: |
           python -u leaflow/Leaflow_checkin.py
 
