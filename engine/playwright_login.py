@@ -1,7 +1,7 @@
 # engine/playwright_login.py
 import asyncio
 from playwright.async_api import async_playwright
-
+from main import parse_socks5
 LOGIN_URL = "https://leaflow.net/login"
 DASHBOARD_URL = "https://leaflow.net/dashboard"
 
@@ -25,9 +25,7 @@ async def open_browser(proxy=None):
     }
 
     if proxy:
-        launch_args["proxy"] = {
-            "server": proxy
-        }
+        launch_args["proxy"] = parse_socks5(proxy)
 
     browser = await pw.chromium.launch(**launch_args)
     ctx = await browser.new_context()
