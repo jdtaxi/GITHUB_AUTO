@@ -139,7 +139,13 @@ def main():
     cookies_map = load_cookies()
     results = []
 
-    for usename, password in accounts.items():
+    for acc in accounts:
+        usename = acc.get("usename")
+        password = acc.get("password")
+    
+        if not usename or not password:
+            print("⚠ 跳过非法账号:", acc)
+            continue
         print(f'----------{usename}----------')
         return
         try:
