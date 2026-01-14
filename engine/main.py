@@ -60,7 +60,7 @@ def check_socks5_proxy(idx, timeout=8):
     返回 (True, ip) 或 (False, None)
     """
     socks5_url = f"socks5://127.0.0.1:{1081 + idx}"##build_socks5_url(proxy)
-
+    print(f"🌐  检测SOCKS5: {socks5_url}")
     proxies = {
         "http": socks5_url,
         "https": socks5_url,
