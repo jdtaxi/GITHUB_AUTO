@@ -26,9 +26,8 @@ def open_browser(proxy: dict = None, headless=True):
 
     # ---------- SOCKS5 检测 ----------
     if proxy and proxy.get("type") == "socks5":
-        ok, ip = check_socks5_proxy(proxy)
+        ok, ip ,socks5_url= check_socks5_proxy(proxy)
         if ok:
-            socks5_url = build_socks5_url(proxy)
             print(f"🧦 使用 SOCKS5 代理，出口 IP = {ip}")
             launch_args["proxy"] = {
                 "server": socks5_url
