@@ -132,7 +132,7 @@ def main():
     if useproxy:
         proxy= config.get("proxy","")
     if proxy:
-        proxy= config.get("value","")
+        proxy= proxy.get("value","")
         
     LF_INFO= config.get("LF_INFO","")
     
