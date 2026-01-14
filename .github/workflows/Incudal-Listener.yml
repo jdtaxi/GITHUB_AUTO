@@ -188,7 +188,7 @@ jobs:
               except:
                   return {}
 
-          def decode_redeem(code_type, code_value):
+          def decode(code_type, code_value):
             type_map = {
                 "c": {"name": "CPU", "unit": "%"},
                 "r": {"name": "内存", "unit": "MB"},
