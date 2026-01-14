@@ -1,7 +1,7 @@
 # engine/playwright_login.py
 import asyncio
 from playwright.async_api import async_playwright
-from main import parse_socks5
+from .main import parse_socks5
 LOGIN_URL = "https://leaflow.net/login"
 DASHBOARD_URL = "https://leaflow.net/dashboard"
 
