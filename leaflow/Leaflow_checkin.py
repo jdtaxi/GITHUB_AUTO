@@ -121,6 +121,11 @@ def process_account(email, password, cookies_map):
 # ================= Main =================
 
 def main():
+    password = os.getenv("CONFIG_PASSWORD")
+    config = getconfig(password)
+    print(config["GROUP"])
+    return
+    
     accounts = load_accounts()
     cookies_map = load_cookies()
     results = []
