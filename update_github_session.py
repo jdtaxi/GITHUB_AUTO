@@ -155,22 +155,35 @@ def main():
             page.wait_for_load_state("networkidle", timeout=30000)
 
             # 2FA
+            # 2FA
             if "two-factor" in page.url:
                 print("🔑 检测到两步验证", flush=True)
-
+            
                 if GH_2FA_SECRET:
                     print("🔢 使用 TOTP 自动生成验证码", flush=True)
                     code = pyotp.TOTP(GH_2FA_SECRET).now()
-                    page.fill('input[autocomplete="one-time-code"]', code)
-                    page.keyboard.press("Enter")
+            
+                    try:
+                        # 等待输入框出现
+                        page.wait_for_selector('input#app_totp', timeout=15000)
+                        page.fill('input#app_totp', code)
+                        page.keyboard.press("Enter")
+                        print("✅ 已填写二次验证验证码", flush=True)
+                    except Exception as e:
+                        print(f"❌ 填写 2FA 失败: {e}", flush=True)
+                        shot = save_screenshot(page, "2fa_failed")
+                        send_notify("❌ GitHub 登录失败", f"填写 2FA 失败: {e}", shot)
+                        return
                 else:
                     print("❌ 未配置 GH_2FA_SECRET，无法继续", flush=True)
                     shot = save_screenshot(page, "2fa_failed")
                     send_notify("❌ GitHub 登录失败", "缺少 2FA 密钥", shot)
                     return
-
+            
+                # 等待页面加载完成
                 time.sleep(3)
                 page.wait_for_load_state("networkidle", timeout=30000)
+
 
             if "login" in page.url:
                 print("❌ GitHub 登录失败", flush=True)
