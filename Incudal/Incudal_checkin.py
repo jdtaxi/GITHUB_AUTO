@@ -774,6 +774,9 @@ class AutoLogin:
         )
         self.log(f"↩️ HTTP {resp.status_code}")
         data = self.safe_json(resp)
+        if data.get("error"):
+            data["message"]=data["details"]
+            return data
         # 示例用法
         code_data = None  # 🔹 先初始化
 
@@ -784,9 +787,10 @@ class AutoLogin:
             code_data = data
         
         if code_data:
-            self.log(f"🟢获得兑换码： {self.decode_redeem(code_data['codeType'], code_data['codeValue'])}")  # 输出: CPU +50%
-            tg_lines.append(f"🟢获得兑换码： {self.decode_redeem(code_data['codeType'], code_data['codeValue'])}")
-        return code_data
+            self.log(f"🟢兑换结果： {self.decode_redeem(code_data['codeType'], code_data['codeValue'])}")  # 输出: CPU +50%
+            tg_lines.append(f"🟢兑换结果： {self.decode_redeem(code_data['codeType'], code_data['codeValue'])}")
+            return code_data
+        return data
 
     def pick_available_proxy(self, timeout=10):
         """
@@ -1104,7 +1108,7 @@ class AutoLogin:
                                 tg_lines.append(f"- {iid}：成功")
                                 success += 1
                             else:
-                                tg_lines.append(f"- {iid}：{data.get('message','已兑换')}")
+                                tg_lines.append(f"- {iid}：{data.get('message','本次失败')}")
                                 level = STATUS_PARTIAL
                         except RequestException:
                             tg_lines.append(f"- {iid}：失败")
