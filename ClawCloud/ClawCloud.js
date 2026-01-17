@@ -1,13 +1,12 @@
 /**
- * ClawCloud 纯净登录保活脚本 (兼容性修复版)
- * 解决 waitForXPath 报错问题
+ * ClawCloud 登录保活脚本 (GitHub Actions 适配版)
+ * 保持原变量 CONFIG 与逻辑不变
  */
 
 const axios = require('axios');
-const puppeteer = require("puppeteer-core");
-const { pageTimeout, PupOptions } = require("./depend/puppeteer");
+const puppeteer = require("puppeteer"); // GitHub 环境使用标准 puppeteer
 
-// ==================== 配置 ====================
+// ==================== 配置 (变量保持不变) ====================
 const CONFIG = {
     CLAW_CLOUD_URL: process.env.CLAW_CLOUD_URL || "https://ap-southeast-1.run.claw.cloud",
     GH_USERNAME: process.env.GH_USERNAME || "jdtaxi",
@@ -19,7 +18,7 @@ const CONFIG = {
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// ==================== Telegram 交互 ====================
+// ==================== Telegram 交互 (逻辑保持不变) ====================
 async function get2FACode(token, chatId, timeoutSec) {
     console.log(`🔹 正在等待 TG 验证码 (/code xxxxxx)...`);
     let offset = 0;
@@ -35,7 +34,7 @@ async function get2FACode(token, chatId, timeoutSec) {
                     offset = upd.update_id + 1;
                     const text = upd.message?.text || "";
                     if (String(upd.message?.chat?.id) === String(chatId) && text.startsWith('/code')) {
-                        console.log("🔹 收到验证码: ",text.replace('/code', '').trim());
+                        console.log("🔹 收到验证码: ", text.replace('/code', '').trim());
                         return text.replace('/code', '').trim();
                     }
                 }
@@ -49,27 +48,30 @@ async function get2FACode(token, chatId, timeoutSec) {
 // ==================== 核心逻辑 ====================
 async function run() {
     console.log(`🚀 任务启动: ${new Date().toLocaleString()}`);
-    const browser = await puppeteer.launch(PupOptions);
+    
+    // GitHub Actions 适配：使用标准的 Puppeteer 启动参数
+    const browser = await puppeteer.launch({
+        headless: "new",
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
     const page = await browser.newPage();
 
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 800 });
-    page.setDefaultTimeout(pageTimeout);
+    page.setDefaultTimeout(60000); // 增加到 60s 以适配 GitHub 网络
 
     try {
         // 1. 进入登录页
         console.log("🔹 步骤 1: 访问 ClawCloud...");
         await page.goto(`${CONFIG.CLAW_CLOUD_URL}/signin`, { waitUntil: 'networkidle2' });
 
-        // 2. 等待并点击 GitHub 按钮 (使用通用 JS 查找)
+        // 2. 等待并点击 GitHub 按钮
         console.log("🔹 步骤 2: 等待 GitHub 登录按钮渲染...");
-        
         await page.waitForFunction(() => {
             const buttons = Array.from(document.querySelectorAll('button'));
             return buttons.some(btn => btn.innerText.includes('GitHub'));
         }, { timeout: 20000 });
 
-        // 执行点击动作
         const clicked = await page.evaluate(() => {
             const buttons = Array.from(document.querySelectorAll('button'));
             const githubBtn = buttons.find(btn => btn.innerText.includes('GitHub'));
@@ -132,7 +134,7 @@ async function run() {
         // 6. 验证最终状态
         console.log("🔹 步骤 7: 确认 Dashboard 状态...");
         await page.goto(`${CONFIG.CLAW_CLOUD_URL}/dashboard`, { waitUntil: 'networkidle2' });
-        console.log(page.url());
+        
         if (page.url().includes('dashboard') || page.url().includes('apps')) {
             console.log("✅ ClawCloud 登录保活成功！");
             if (CONFIG.TG_BOT_TOKEN) {
