@@ -31,4 +31,4 @@ jobs:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           CLAW_CLOUD_URL: "https://ap-southeast-1.run.claw.cloud"
-        run: node ClowCloud/ClowCloud.js
+        run: node ClawCloud/ClawCloud.js
