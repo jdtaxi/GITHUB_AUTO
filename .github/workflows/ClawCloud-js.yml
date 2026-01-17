@@ -1,0 +1,34 @@
+name: ClawCloud Keepalive
+
+# 触发条件
+on:
+  workflow_dispatch:      # 支持在 GitHub 页面手动点击运行
+  schedule:
+    - cron: '30 16 * * *'   # 每天北京时间 00:30 自动运行 (UTC 16:30)
+
+jobs:
+  keepalive_job:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 1. 获取仓库代码
+        uses: actions/checkout@v4
+
+      - name: 2. 安装 Node.js 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 3. 安装脚本依赖
+        # 只需要安装 puppeteer 和 axios
+        run: npm install puppeteer axios
+
+      - name: 4. 执行保活脚本
+        # 这里将 Secrets 映射为环境变量供脚本读取
+        env:
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
+          GH_PASSWORD: ${{ secrets.GH_PASSWORD }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          CLAW_CLOUD_URL: "https://ap-southeast-1.run.claw.cloud"
+        run: node ClowCloud/claw.js
