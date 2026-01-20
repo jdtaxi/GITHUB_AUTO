@@ -208,7 +208,7 @@ class AutoLogin:
     def log(self, msg, level="INFO"):
         icons = {"INFO": "ℹ️", "SUCCESS": "✅", "ERROR": "❌", "WARN": "⚠️", "STEP": "🔹"}
         line = f"{icons.get(level, '•')} {msg}"
-        print(line)
+        print(line, flush=True)
         self.logs.append(line)
     
     def shot(self, page, name):
