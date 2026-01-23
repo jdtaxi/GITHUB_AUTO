@@ -182,10 +182,11 @@ def main():
     logger.info(f"获取到 {len(packages)} 个 package")
 
     for pkg in packages:
-        if "德国" in pkg['name'] or "法国" in pkg['name']:
-            logger.info(f"🚫 跳过 packageId={pkg['id']} ({pkg['name']})")
-        else:
+        if "美国" in pkg['name'] :
             logger.info(f"➡️ 尝试 packageId={pkg['id']} ({pkg['name']})")
+        else:
+            logger.info(f"🚫 跳过 packageId={pkg['id']} ({pkg['name']})")
+            
     
             if create_instance_with_retry(session, pkg, retries=3):
                 logger.info("🎉 脚本结束（已成功创建实例）")
